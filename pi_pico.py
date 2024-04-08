@@ -17,6 +17,7 @@ from lib.msgAPI import messageAPI
 import RPi.GPIO as GPIO  
 import serial
 import time
+import os
 
 #---------------------------------------------------------------------
 #                          CLASSES
@@ -132,7 +133,13 @@ class pi_pico:
 		time.sleep(2)
 		GPIO.output(self.power_cycle_pin, GPIO.LOW)
 
-	
+	# ==================================
+	# load_software()
+	# ==================================
+	def load_software( self, elf_file_path ) -> 'None':
+		self.write_read_uart( "bootsel" )
+		os.system( "picotool load {}".format( elf_file_path) )
+		self.power_cycle()
 
 	# ==================================
 	# helper function: __verify_test_mode()
