@@ -61,7 +61,7 @@ class pi_pico:
 		# ------------------------------------
 		# attempt to place pico into test mode
 		# ------------------------------------
-		rtn = self.console_conn.read_and_write( "testmode")
+		rtn = self.console_conn.write_and_read( "testmode")
 		if self.__verify_test_mode( rtn, enabled ):
 			return True
 
@@ -69,7 +69,7 @@ class pi_pico:
 		# since first attempt failed, try again
 		# (toggle behavior)
 		# ------------------------------------
-		rtn = self.console_conn.read_and_write( "testmode")
+		rtn = self.console_conn.write_and_read( "testmode")
 		if self.__verify_test_mode( rtn, enabled ):
 			return False
 		
@@ -97,7 +97,6 @@ class pi_pico:
 	# ==================================
 	def load_software( self, elf_file_path ) -> 'None':
 		self.console_conn.write_and_read( "bootsel" )
-		self.write_read_uart( "bootsel" )
 		os.system( "picotool load {}".format( elf_file_path) )
 		self.power_cycle()
 
