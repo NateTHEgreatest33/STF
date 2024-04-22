@@ -14,8 +14,9 @@
 #                              IMPORTS
 #---------------------------------------------------------------------
 from lib.msgAPI import messageAPI
+from lib.consoleAPI import consoleAPI
+
 import RPi.GPIO as GPIO  
-import serial
 import time
 import os
 
@@ -24,6 +25,7 @@ import os
 #---------------------------------------------------------------------
 class pi_pico:
 	msg_conn = None
+	console_conn = None
 
 	# ==================================
 	# Constructor
@@ -35,14 +37,7 @@ class pi_pico:
 								currentModule = 0x00, 
 								listOfModules=[0x00,0x01,0x02] 
 								)
-		self.__uart_conn = serial.Serial(
-								port='/dev/ttyS0',
-								baudrate = 115200,
-								parity=serial.PARITY_NONE,
-								stopbits=serial.STOPBITS_ONE,
-								bytesize=serial.EIGHTBITS,
-								timeout=1
-								)
+		self.console_conn = consoleAPI()
 		self.msg_conn.InitAPI()
 		self.set_test_mode( test_mode )
 	
@@ -58,42 +53,6 @@ class pi_pico:
 		GPIO.setup(self.power_cycle_pin, GPIO.OUT )
 
 		self.power_cycle()
-		
-	# ==================================
-	# write_read_uart()
-	# ==================================
-	def write_read_uart(self, str, return_carrige = True, read_limit = 500 ) -> 'list':
-		# ------------------------------------
-		# Clear TX buffer with \r and clear 
-		# input buffer by flushing
-		# ------------------------------------
-		self.__uart_conn.write( [ ord('\r') ] )
-		time.sleep(.1)
-		self.__uart_conn.flushInput()
-
-		# ------------------------------------
-		# convert string to hex & append carrige
-		# return if expected
-		# ------------------------------------
-		hex_list = self.__str_to_hex_list( str )
-	
-		if( return_carrige ):
-			hex_list.append( ord('\r') )
-		
-		# ------------------------------------
-		# write message
-		# ------------------------------------
-		self.__uart_conn.write( hex_list )
-		time.sleep( .1 )
-		
-		# ------------------------------------
-		# read up to limit specified, decode,
-		# and return string
-		# ------------------------------------
-		rtn_data = self.__uart_conn.read( read_limit )
-		rtn_data = rtn_data.decode( "utf-8" )
-		
-		return rtn_data
 	
 	# ==================================
 	# set_test_mode()
@@ -102,7 +61,7 @@ class pi_pico:
 		# ------------------------------------
 		# attempt to place pico into test mode
 		# ------------------------------------
-		rtn = self.write_read_uart( "testmode")
+		rtn = self.console_conn.read_and_write( "testmode")
 		if self.__verify_test_mode( rtn, enabled ):
 			return True
 
@@ -110,7 +69,7 @@ class pi_pico:
 		# since first attempt failed, try again
 		# (toggle behavior)
 		# ------------------------------------
-		rtn = self.write_read_uart( "testmode")
+		rtn = self.console_conn.read_and_write( "testmode")
 		if self.__verify_test_mode( rtn, enabled ):
 			return False
 		
@@ -137,6 +96,7 @@ class pi_pico:
 	# load_software()
 	# ==================================
 	def load_software( self, elf_file_path ) -> 'None':
+		self.console_conn.write_and_read( "bootsel" )
 		self.write_read_uart( "bootsel" )
 		os.system( "picotool load {}".format( elf_file_path) )
 		self.power_cycle()
@@ -147,16 +107,6 @@ class pi_pico:
 	def __verify_test_mode( self, rtn_str, enabled ) -> 'bool':
 		expected_str = ( "testmode\r\nTest Mode: enabled\r\n" if enabled  else "testmode\r\nTest Mode: disabled\r\n")
 		return ( rtn_str == expected_str )
-
-	# ==================================
-    # helper function: str_to_hex()
-    # ==================================
-	def __str_to_hex_list(self, str) -> 'list':
-		hex_list = []
-		for i in str:
-			hex_list.append( ord( i ) )
-
-		return hex_list
 	
 	# ==================================
     # deconstructor
