@@ -81,7 +81,7 @@ class consoleAPI:
 		# ------------------------------------
 		# read line and decode
 		# ------------------------------------
-		return_str = self.readLine( str, auto_return_carrige, read_limit )
+		return_str = self.readLine( read_limit )
 		return_str = return_str.decode( "utf-8" )
 
 		return return_str
