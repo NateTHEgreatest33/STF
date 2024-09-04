@@ -42,7 +42,7 @@ class consoleAPI:
 		# convert string to hex & append carrige
 		# return if expected
 		# ------------------------------------
-		hex_list = self.__str_to_hex_list( str )
+		hex_list = self.__str_to_hex_list( input_str )
 
 		if( auto_return_carrige ):
 			hex_list.append( ord('\r') )
@@ -66,7 +66,7 @@ class consoleAPI:
 	# ==================================
     # write_and_read() 
     # ==================================
-	def write_and_read(self, str, auto_return_carrige = True, read_limit = 500 ) -> 'str':
+	def write_and_read(self, in_str, auto_return_carrige = True, read_limit = 500 ) -> 'str':
 		# ------------------------------------
 		# clear connection so message is Tx/RX'ed
 		# fresh
@@ -76,7 +76,7 @@ class consoleAPI:
 		# ------------------------------------
 		# write line
 		# ------------------------------------
-		self.writeLine( str, auto_return_carrige )
+		self.writeLine( in_str, auto_return_carrige )
 
 		# ------------------------------------
 		# read line and decode
@@ -97,9 +97,9 @@ class consoleAPI:
 	# ==================================
     # helper function: str_to_hex()
     # ==================================
-	def __str_to_hex_list(self, str) -> 'list':
+	def __str_to_hex_list(self, in_str) -> 'list':
 		hex_list = []
-		for i in str:
+		for i in in_str:
 			hex_list.append( ord( i ) )
 
 		return hex_list

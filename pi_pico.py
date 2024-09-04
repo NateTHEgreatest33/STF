@@ -1,105 +1,116 @@
 #*********************************************************************
 #
 #   MODULE NAME:
-#       consoleAPI.py - ConsoleAPI Interfacing Class
+#       pi_pico.py - Raspberry Pi Pico Testing Class
 #
 #   DESCRIPTION:
-#       Class to provide functionaility for interacting with the Raspberry
-#		pi pico through the console
+#       Class to provide functionaility for testing with the Raspberry
+#		pi pico.
 #
 #   Copyright 2024 by Nate Lenze
 #*********************************************************************
 
 #---------------------------------------------------------------------
 #                              IMPORTS
-#--------------------------------------------------------------------- 
-import serial
+#---------------------------------------------------------------------
+from lib.msgAPI import messageAPI
+from lib.consoleAPI import consoleAPI
+
+import RPi.GPIO as GPIO  
 import time
+import os
 
 #---------------------------------------------------------------------
 #                          CLASSES
 #---------------------------------------------------------------------
-class consoleAPI:
-	__uart_conn = None
+class pi_pico:
+	msg_conn = None
+	console_conn = None
+
+	# ==================================
+	# Constructor
+	# ==================================
+	def __init__(self, test_mode = False, power_cycle_pin=23 ):
+		self.msg_conn = messageAPI( 
+								bus = 0, 
+								chip_select = 0, 
+								currentModule = 0x00, 
+								listOfModules=[0x00,0x01,0x02] 
+								)
+		self.console_conn = consoleAPI()
+		self.msg_conn.InitAPI()
+		self.set_test_mode( test_mode )
+	
+		# ------------------------------------
+		# setup power cycle pin. Power cycle
+		# happens when RUN pin on the pico
+		# is connected to ground. To implement
+		# this a relay, controlled by the 3B+,
+		# connects or disconnects the circuit
+		# ------------------------------------
+		self.power_cycle_pin = power_cycle_pin
+		GPIO.setmode(GPIO.BCM)
+		GPIO.setup(self.power_cycle_pin, GPIO.OUT )
+
+		self.power_cycle()
 	
 	# ==================================
-    # constructor() 
-    # ==================================	
-	def __init__(self):
-		self.__uart_conn = serial.Serial(
-							port='/dev/ttyS0',
-							baudrate = 115200,
-							parity=serial.PARITY_NONE,
-							stopbits=serial.STOPBITS_ONE,
-							bytesize=serial.EIGHTBITS,
-							timeout=1
-							)
+	# set_test_mode()
 	# ==================================
-    # writeLine() 
-    # ==================================	
-	def writeLine(self, input_str: str , auto_return_carrige: bool = True  ) -> 'bool':
+	def set_test_mode( self, enabled ) -> 'bool':
 		# ------------------------------------
-		# convert string to hex & append carrige
-		# return if expected
+		# attempt to place pico into test mode
 		# ------------------------------------
-		hex_list = self.__str_to_hex_list( input_str )
-
-		if( auto_return_carrige ):
-			hex_list.append( ord('\r') )
+		rtn = self.console_conn.write_and_read( "testmode")
+		if self.__verify_test_mode( rtn, enabled ):
+			return True
 
 		# ------------------------------------
-		# write message
+		# since first attempt failed, try again
+		# (toggle behavior)
 		# ------------------------------------
-		self.__uart_conn.write( hex_list )
-		time.sleep(.1)
+		rtn = self.console_conn.write_and_read( "testmode")
+		if self.__verify_test_mode( rtn, enabled ):
+			return False
+		
+		# ------------------------------------
+		# if still unable to enter test mode
+		# there must be another issue, print
+		# error and exit
+		# ------------------------------------
+		print("Test mode not working")
+		return False
 	
 	# ==================================
-    # readLine(): Used to manually read
-	# from the uart buffer.
-	#
-	# NOTE: old data can reside in the buffer
-	# if it has not been flushed. 
-    # ==================================
-	def readLine(self, read_limit_size: int ) -> ' str':
-		return self.__uart_conn.read( read_limit_size )
+	# power_cycle()
+	# ==================================
+	def power_cycle( self ) -> 'None':
+		# ------------------------------------
+		# Power Off, Sleep 2s, Power On
+		# ------------------------------------
+		GPIO.output(self.power_cycle_pin, GPIO.HIGH)
+		time.sleep(2)
+		GPIO.output(self.power_cycle_pin, GPIO.LOW)
+
+	# ==================================
+	# load_software()
+	# ==================================
+	def load_software( self, elf_file_path ) -> 'None':
+		self.console_conn.write_and_read( "bootsel" )
+		os.system( "picotool load {}".format( elf_file_path) )
+		self.power_cycle()
+
+	# ==================================
+	# helper function: __verify_test_mode()
+	# ==================================
+	def __verify_test_mode( self, rtn_str, enabled ) -> 'bool':
+		expected_str = ( "testmode\r\nTest Mode: enabled\r\n" if enabled  else "testmode\r\nTest Mode: disabled\r\n")
+		return ( rtn_str == expected_str )
 	
 	# ==================================
-    # write_and_read() 
+    # deconstructor
     # ==================================
-	def write_and_read(self, in_str, auto_return_carrige = True, read_limit = 500 ) -> 'str':
-		# ------------------------------------
-		# clear connection so message is Tx/RX'ed
-		# fresh
-		# ------------------------------------
-		self.clear_connection()
-
-		# ------------------------------------
-		# write line
-		# ------------------------------------
-		self.writeLine( in_str, auto_return_carrige )
-
-		# ------------------------------------
-		# read line and decode
-		# ------------------------------------
-		return_str = self.readLine( str, auto_return_carrige, read_limit )
-		return_str = return_str.decode( "utf-8" )
-
-		return return_str
-	
-	# ==================================
-    # clear_connection() 
-    # ==================================
-	def clear_connection(self) -> 'None':
-		self.__uart_conn.write( [ ord('\r') ] )
-		time.sleep(.1)
-		self.__uart_conn.flushInput()
-
-	# ==================================
-    # helper function: str_to_hex()
-    # ==================================
-	def __str_to_hex_list(self, in_str) -> 'list':
-		hex_list = []
-		for i in in_str:
-			hex_list.append( ord( i ) )
-
-		return hex_list
+	def __del__(self):
+		# Reset test mode at end of test
+		self.set_test_mode( False )
+		self.power_cycle()
