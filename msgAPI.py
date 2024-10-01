@@ -47,7 +47,7 @@ class messageAPI:
 		#setup local var's
 		self.currentModule = currentModule
 		self.listOfModules = listOfModules
-		self.version_num = 1
+		self.version_num = 2
 		self.curr_key = 0x00
 		self.debug_prints = True
 
