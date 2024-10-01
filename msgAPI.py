@@ -282,15 +282,19 @@ class messageAPI:
 			msg = [0x80 | 0x00,x]
 			result = self.spi.xfer2(msg)
 
+		#set fifo size
 		msg = [0x80 | 0x22,messageSize]
 		result = self.spi.xfer2(msg)
 
+		#put into tx mode
 		msg = [0x80 | 0x01, 0x83]
 		result = self.spi.xfer2(msg)
 
 		#wait until Tx is done
 		msg = [0x00 | 0x12, 0x00]
 		result = self.spi.xfer2(msg) 
+
+		#wait until txDone flag is set
 		while(result[1] & 0x08 != 0x08):
 			msg = [0x00 | 0x12, 0x00]
 			result = self.spi.xfer2(msg)
