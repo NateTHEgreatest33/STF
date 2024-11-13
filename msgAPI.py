@@ -36,6 +36,8 @@ crc8_table = [
 0xA8, 0x39, 0x4B, 0xDA, 0xAF, 0x3E, 0x4C, 0xDD, 0xA6, 0x37, 0x45, 0xD4, 0xA1, 0x30, 0x42, 0xD3,
 0xB4, 0x25, 0x57, 0xC6, 0xB3, 0x22, 0x50, 0xC1, 0xBA, 0x2B, 0x59, 0xC8, 0xBD, 0x2C, 0x5E, 0xCF]
 
+LORA_FIFO_SIZE = 0x80 
+
 #---------------------------------------------------------------------
 #                              CLASSES
 #---------------------------------------------------------------------
@@ -50,6 +52,7 @@ class messageAPI:
 		self.version_num = 2
 		self.curr_key = 0x00
 		self.debug_prints = True
+		self.last_fifo_idx = 0;
 
 		# Enable SPI
 		self.spi = spidev.SpiDev()
@@ -185,24 +188,28 @@ class messageAPI:
     # __LoraCheckMessage()
     # ==================================
 	def __LoraCheckMessage(self):
+
+		#read from status register
 		msg = [0x00 | 0x12, 0x00]
 		result = self.spi.xfer2(msg)
 
+		# done flag (0x40) and valid header flag (0x10)
 		if(result[1] & 0x40 == 0x40 and result[1] & 0x10 == 0x10): 
 
 			msg = [0x00 | 0x13, 0x00]
 			result = self.spi.xfer2(msg)
 			numBytesReceived = result[1]
 
+			# this refers to the last msg only, so this check is still
+			# valid even with multi-msg support
 			if numBytesReceived > 10:
 				msg = [0x80 | 0x12, 0xFF]
 				result = self.spi.xfer2(msg)
 				return False
 			return True
 
+		#timeout mask (0x80) or crc error flag (0x020)
 		elif(result[1] & 0x80 == 0x80 or result[1] & 0x20 == 0x20):
-			#0x80 = RX timeout
-			#0x20 = CRC error
 			#clear flag
 			msg = [0x80 | 0x12, 0xFF]
 			result = self.spi.xfer2(msg)
@@ -217,7 +224,6 @@ class messageAPI:
     # __LoraReadMessage()
     # ==================================
 	def __LoraReadMessage(self):
-
 		#clear flag
 		msg = [0x80 | 0x12, 0xFF]
 		result = self.spi.xfer2(msg)
@@ -226,16 +232,37 @@ class messageAPI:
 		msg = [0x00 | 0x12, 0x00]
 		result = self.spi.xfer2(msg)
 
-		#extract data - - - 
+		#get data sizeof the *LAST* msg rx'ed
 		msg = [0x00 | 0x13, 0x00]
 		result = self.spi.xfer2(msg)
 		numBytesReceived = result[1]
+
+		#get current fifo ptr
 		msg = [0x00 | 0x10, 0x00]
 		result = self.spi.xfer2(msg)
-		storageLocation = result[1]
+		current_fifo_ptr = result[1]
 
-		#set fifo to storage location
-		msg = [0x80 | 0x0D, storageLocation]
+		#set the read idx to the current msg idx
+		read_idx = current_fifo_ptr
+
+		# compare last read index vs. current msg index. if these
+		# values do not match, we have rx'ed more than one message
+		# and we need to update our read index accordingly
+		if( self.last_fifo_idx != current_fifo_ptr ):
+			#account for fifo rollover
+			if( current_fifo_ptr < self.last_fifo_idx ):
+				numBytesReceived = ( numBytesReceived ) + ( LORA_FIFO_SIZE  - self.last_fifo_idx ) + ( current_fifo_ptr )
+			else:
+				numBytesReceived = ( numBytesReceived ) + ( current_fifo_ptr - self.last_fifo_idx );
+
+			#update read idx
+			read_idx = self.last_fifo_idx;
+
+		# update last fifo for next run
+		self.last_fifo_idx = (read_idx + numBytesReceived ) % LORA_FIFO_SIZE
+
+		# load read_idx into fifo ptr register
+		msg = [0x80 | 0x0D, read_idx ]
 		result = self.spi.xfer2(msg)
 
 		#extract data
