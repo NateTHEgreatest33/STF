@@ -106,13 +106,14 @@ class messageAPI:
 		self.__LoraSendMessage(message, len(message))
 		self.__LoraSetRxMode()
 		return True
+		
 
     # ==================================
-    # RXMessage()
+    # RX_Single()
     # ==================================
-	def RXMessage(self):
+	def RX_Single(self):
 		if self.__LoraCheckMessage() == True:
-			return_msg = self.__LoraReadMessage()
+			return_msg = self.__LoraReadMessageSingle()
 
 			#print full message
 			if self.debug_prints:
@@ -156,6 +157,33 @@ class messageAPI:
 			return False, 0xFF, [], True
 
     # ==================================
+    # RX_multi()
+    # ==================================
+	def RX_Multi(self):
+		if self.__LoraCheckMessage() == True:
+			return_msg = self.__LoraReadMessageMulti()
+
+			#print full message
+			if self.debug_prints:
+				print("Full message received: {",end =" ")
+				for x in return_msg:
+					print(hex(x),end = " ")
+				print("}")
+
+			return self.__parseRawLora( return_msg )
+
+		else:
+			return None
+
+
+    # ==================================
+    # RXMessage()
+    # ==================================
+	def RXMessage(self):
+		print( "RX Message as been depricated")
+		return self.RX_single()
+	
+    # ==================================
     # updateKey()
     # ==================================
 	def updateKey(self, newKey):
@@ -169,6 +197,62 @@ class messageAPI:
 		for i in message:
 			crc = crc8_table[ crc ^ i ]
 		return crc
+
+    # ==================================
+    # __parseRawLora()
+    # ==================================
+	def __parseRawLora(self, message):
+		#return format [ numRx, [[source, data, validity]] ]
+		num_rx = 0
+		start_index = 0
+		parsed_data = []
+		curr_msg = message 
+
+		#Message too small to parse
+		if len( curr_msg ) < 6:
+			return None
+
+		while( len(curr_msg) > 6 ):
+			# Parse message
+			# Byte 0 -- destination byte
+			# Byte 1 -- source byte
+			# Byte 2 -- pad (future expantion)
+			# Byte 3 -- version/size byte (upper/lower bits)
+			# Byte 4 -- key byte
+			# Byte 5 -- start of data region
+			# Byte X -- crc (last byte)
+			dataSize = curr_msg[3] & 0x0F
+			curr_msg = message[start_index:(start_index + 6 + dataSize)]
+
+			destination = curr_msg[0]
+			if destination == self.currentModule:
+				source = curr_msg[1]
+				version = ( curr_msg[3] & 0xF0 ) >> 4
+				key = curr_msg[4]
+				data = curr_msg[5:-1]
+				crc = curr_msg[ len( curr_msg ) - 1 ]
+
+				#confirm key & crc
+				if key != self.curr_key:
+					valid = False
+				elif crc != self.__updateCRC( curr_msg[:-1] ):
+					valid = False
+				elif version != self.version_num:
+					valid = False
+				else:
+					valid = True
+
+				parsed_data.append( [source, data, valid] )
+				num_rx = num_rx + 1
+
+			start_index = start_index + 6 + dataSize
+			curr_msg = message[start_index:]
+
+		if num_rx != 0:
+			return num_rx, parsed_data
+		else:
+			return None
+
 
     # ==================================
     # __LoraInit()
@@ -221,9 +305,47 @@ class messageAPI:
 		return False
 
     # ==================================
-    # __LoraReadMessage()
+    # __LoraReadMessageSingle()
     # ==================================
-	def __LoraReadMessage(self):
+	def __LoraReadMessageSingle(self):
+
+		#clear flag
+		msg = [0x80 | 0x12, 0xFF]
+		result = self.spi.xfer2(msg)
+
+		#verify flag has been cleared
+		msg = [0x00 | 0x12, 0x00]
+		result = self.spi.xfer2(msg)
+
+		#extract data - - - 
+		msg = [0x00 | 0x13, 0x00]
+		result = self.spi.xfer2(msg)
+		numBytesReceived = result[1]
+		msg = [0x00 | 0x10, 0x00]
+		result = self.spi.xfer2(msg)
+		storageLocation = result[1]
+
+		#set fifo to storage location
+		msg = [0x80 | 0x0D, storageLocation]
+		result = self.spi.xfer2(msg)
+
+		#extract data
+		storageArray = []
+		for x in range(numBytesReceived):
+			msg = [0x00 | 0x00, 0x00]
+			result = self.spi.xfer2(msg)
+			storageArray.append(result[1])
+
+		#reset FIFO ptr
+		msg = [0x80 | 0x0D, 0x00]
+		result = self.spi.xfer2(msg)
+
+		return storageArray
+
+    # ==================================
+    # __LoraReadMessageMulti()
+    # ==================================
+	def __LoraReadMessageMulti(self):
 		#clear flag
 		msg = [0x80 | 0x12, 0xFF]
 		result = self.spi.xfer2(msg)
