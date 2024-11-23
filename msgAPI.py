@@ -364,6 +364,11 @@ class messageAPI:
 		result = self.spi.xfer2(msg)
 		current_fifo_ptr = result[1]
 
+		#get current fifo ptr
+		msg = [0x00 | 0x10, 0x00]
+		result = self.spi.xfer2(msg)
+		fifo_base_addr = result[1]
+
 		#set the read idx to the current msg idx
 		read_idx = current_fifo_ptr
 
@@ -373,7 +378,7 @@ class messageAPI:
 		if( self.last_fifo_idx != current_fifo_ptr ):
 			#account for fifo rollover
 			if( current_fifo_ptr < self.last_fifo_idx ):
-				numBytesReceived = ( numBytesReceived ) + ( LORA_FIFO_SIZE  - self.last_fifo_idx ) + ( current_fifo_ptr )
+				numBytesReceived = ( numBytesReceived ) + ( LORA_FIFO_SIZE  - self.last_fifo_idx ) + ( current_fifo_ptr - fifo_base_addr )
 			else:
 				numBytesReceived = ( numBytesReceived ) + ( current_fifo_ptr - self.last_fifo_idx );
 
@@ -394,10 +399,6 @@ class messageAPI:
 			result = self.spi.xfer2(msg)
 			storageArray.append(result[1])
 
-		#reset FIFO ptr
-		msg = [0x80 | 0x0D, 0x00]
-		result = self.spi.xfer2(msg)
-
 		return storageArray
 
     # ==================================
@@ -415,6 +416,9 @@ class messageAPI:
 		msg = [0x80 | 0x01,0x85]
 		result = self.spi.xfer2(msg)
 
+		#update fifo ptr since mode 
+		#changes reset this
+		self.last_fifo_idx = 0
 
     # ==================================
     # __LoraSendMessage()
