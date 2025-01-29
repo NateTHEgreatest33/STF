@@ -280,16 +280,19 @@ class messageAPI:
 		# done flag (0x40) and valid header flag (0x10)
 		if(result[1] & 0x40 == 0x40 and result[1] & 0x10 == 0x10): 
 
+			#read number of byted rx'ed
 			msg = [0x00 | 0x13, 0x00]
 			result = self.spi.xfer2(msg)
 			numBytesReceived = result[1]
 
-			# this refers to the last msg only, so this check is still
-			# valid even with multi-msg support
-			if numBytesReceived > 10:
+			#msgAPI only supports 10 byte messages + 6 bytes for the header
+			if numBytesReceived > 16:
+				if self.debug_prints:
+					print( ">16 bytes rx'ed: {}".format(numBytesReceived))
 				msg = [0x80 | 0x12, 0xFF]
 				result = self.spi.xfer2(msg)
 				return False
+			
 			return True
 
 		#timeout mask (0x80) or crc error flag (0x020)
