@@ -39,8 +39,7 @@ class pi_pico:
 								)
 		self.console_conn = consoleAPI()
 		self.msg_conn.InitAPI()
-		self.set_test_mode( test_mode )
-	
+		
 		# ------------------------------------
 		# setup power cycle pin. Power cycle
 		# happens when RUN pin on the pico
@@ -53,6 +52,7 @@ class pi_pico:
 		GPIO.setup(self.power_cycle_pin, GPIO.OUT )
 
 		self.power_cycle()
+		self.set_test_mode( test_mode )
 	
 	# ==================================
 	# set_test_mode()
@@ -91,6 +91,8 @@ class pi_pico:
 		GPIO.output(self.power_cycle_pin, GPIO.HIGH)
 		time.sleep(2)
 		GPIO.output(self.power_cycle_pin, GPIO.LOW)
+		time.sleep(1) #allow to come back online
+
 
 	# ==================================
 	# load_software()
