@@ -63,25 +63,69 @@ class Mailbox():
 
 
     def tx_runtime( self ):
-        if self.round_counter == self.msg_conn.currentModule:
+        if self.round_counter != self.msg_conn.currentModule:
+            return
+        
+        #determine which entries need handling
+        for idx, [data, rate, flag, dir, src, dest] in enumerate(self.mailbox_map):
+            if src ==  self.msg_conn.currentModule:
+                if ( rate == 'ASYNC' and flag == True ) or ( rate != 'ASYNC' and (int(rate)%self.round_counter == 0) ):
+                    self.tx_queue.append( ['data', idx] )
 
-            #determine which entries need handling
-            for idx, [data, rate, flag, dir, src, dest] in enumerate(self.mailbox_map):
-                if src ==  self.msg_conn.currentModule:
-                    if ( rate == 'ASYNC' and flag == True ) or ( rate != 'ASYNC' and (int(rate)%self.round_counter == 0) ):
-                        self.tx_queue.append( ['data', idx] )
 
+        self.tx_queue.append( [ 'round', 0 ] ) 
 
-            self.tx_queue.append( [ 'round', 0 ] ) 
+        self.__msg_interface_pack_and_send()
 
-            self.__msg_interface_pack_and_send()
-
-            #update round counter
-            self.round_counter = (self.round_counter + 1 )% 100 
+        #update round counter
+        self.round_counter = (self.round_counter + 1 )% 100 
 
     def __msg_interface_pack_and_send( self ):
-        for type, data in self.tx_queue:
-            print()
+
+        msg_data = []
+        msg_dest = None
+        
+        for data_type, data_idx in self.tx_queue:
+
+            #determine data size
+            match data_type:
+                case 'data':
+                    data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
+                    data_size = 1 if type(data_var) is bool else 4
+                    data_dest = dest
+                    data_formated = []                                                          #<-- create data here
+                case 'ack':
+                    data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
+                    data_size = 1
+                    data_dest = src
+                    data_formated = []                                                          #<-- create data here
+                case 'round':
+                    data_size = 1
+                    data_dest = 'ALL'
+                    data_formated = []                                                          #<-- create data here
+                case _:
+                    print(" unsupported data type")
+
+            #determine destination
+            if msg_dest == None:    #<-- first run
+                msg_dest = data_dest
+            elif msg_dest != data_dest: #<-- if non matching its all
+                msg_data = 'ALL'
+
+            #determine if we can fit into current_msg
+            if (len(msg_data) + data_size + 1) > 10:
+                self.msg_conn.TXMessage( msg_data, msg_dest )
+                msg_data = []
+                msg_dest = data_dest
+            
+            #append data to end
+            for data_bytes in data_formated:
+                msg_data.append( data_bytes ) #<- check for ack and round format
+
+
+        #need to run tx one more time incase its the last round
+        if len(msg_data) != 0:
+            self.msg_conn.TXMessage( msg_data, msg_dest )
 
         #empty tx queue
         self.tx_queue = []
