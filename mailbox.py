@@ -14,6 +14,8 @@
 #                              IMPORTS
 #--------------------------------------------------------------------- 
 import time
+import numpy as np # required for float32
+
 from msgAPI import messageAPI
 #---------------------------------------------------------------------
 #                              VARIABLES
@@ -47,9 +49,11 @@ class Mailbox():
         self.mailbox_map   = gbl_mailbox
         self.round_counter = 0 # round counter always starts at 0 
         self.ack_list     = []
+        self.expecting_ack_map = {}
         self.current_round = 0
 
         self.tx_queue = []
+        print( "Warning Mailbox is NOT currently thread safe!")
 
         #
     def mailbox_runtime( self ):
@@ -58,27 +62,45 @@ class Mailbox():
 
 
     def rx_runtime( self ):
-        raise( NotImplementedError)
-        # self.tx_queue.append( ['ack', idx])
+        num_rx, data_rx = self.msg_conn.RX_Multi()
+        
+        #if msg rx'ed parse through each one
+        if num_rx != 0:
+            for msg in data_rx:
+                rx_src, rx_data, rx_validity = data_rx[msg]
+                if rx_validity != True:
+                    print("Invalid msg Rx'ed: src/{} data/{} valid/{}".format(rx_src, rx_data, rx_validity))
+                    continue
+                self.__parse_rx( rx_data )
 
 
     def tx_runtime( self ):
         if self.round_counter != self.msg_conn.currentModule:
             return
         
+        #verify acks
+        for idx in self.expecting_ack_map:
+            if self.expecting_ack_map[idx] == True:
+                print("Missing ACK for idx {}".format( idx ) )
+                self.expecting_ack_map[ idx ] = False #clear for next run
+
         #determine which entries need handling
         for idx, [data, rate, flag, dir, src, dest] in enumerate(self.mailbox_map):
             if src ==  self.msg_conn.currentModule:
                 if ( rate == 'ASYNC' and flag == True ) or ( rate != 'ASYNC' and (int(rate)%self.round_counter == 0) ):
                     self.tx_queue.append( ['data', idx] )
+                    self.expecting_ack_map[ idx ] = True
 
-
+        # lastly update round
         self.tx_queue.append( [ 'round', 0 ] ) 
 
         self.__msg_interface_pack_and_send()
 
+
+
+
         #update round counter
-        self.round_counter = (self.round_counter + 1 )% 100 
+        # self.round_counter = (self.round_counter + 1 )% 100 
 
     def __msg_interface_pack_and_send( self ):
 
@@ -93,27 +115,31 @@ class Mailbox():
                     data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
                     data_size = 1 if type(data_var) is bool else 4
                     data_dest = dest
-                    data_formated = []                                                          #<-- create data here
+                    data_formated = self.__data_type_handler( data_var, data_idx )
+                    
                 case 'ack':
                     data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
                     data_size = 1
                     data_dest = src
-                    data_formated = []                                                          #<-- create data here
+                    data_formated = [ACK_ID, data_idx]
+
                 case 'round':
                     data_size = 1
                     data_dest = 'ALL'
-                    data_formated = []                                                          #<-- create data here
+                    self.__round_update()
+                    data_formated = [ MSG_UPDATE_ID, self.current_round ]
+
                 case _:
-                    print(" unsupported data type")
+                    raise( "Incorrect data type" )
 
             #determine destination
-            if msg_dest == None:    #<-- first run
+            if msg_dest == None:
                 msg_dest = data_dest
-            elif msg_dest != data_dest: #<-- if non matching its all
-                msg_data = 'ALL'
+            elif msg_dest != data_dest:
+                msg_dest = 'ALL'
 
-            #determine if we can fit into current_msg
-            if (len(msg_data) + data_size + 1) > 10:
+            #determine if we can fit into current_msg, if not send current message
+            if (len(msg_data) + len(data_formated) ) > 10:
                 self.msg_conn.TXMessage( msg_data, msg_dest )
                 msg_data = []
                 msg_dest = data_dest
@@ -131,6 +157,66 @@ class Mailbox():
         self.tx_queue = []
 
 
+    def __data_type_handler( self, data, idx ):
+        match( data ):
+            case int():
+                return [ idx, (data >> 24 ), ((data >> 16) & 0x000000FF), ((data >> 8) & 0x000000FF), (data & 0x000000FF)]
+            case bool():
+                return [ idx, int(data) ]
+            case float():
+                temp_data = np.float32(data)
+                return [ idx, (temp_data >> 24 ), ((temp_data >> 16) & 0x000000FF), ((temp_data >> 8) & 0x000000FF), (temp_data & 0x000000FF)]
+            case _:
+                print(" unsupported data type")
+
+    def __round_update( self ):
+        self.current_round = (self.current_round + 1 )% len( self.msg_conn.listOfModules )
+
+    def __parse_rx(self, rx_data ):
+        idx = 0
+
+        while idx < len( rx_data):
+            data_type = rx_data[idx]
+            match( data_type ):
+                case ACK_ID:
+                    idx = idx + 1
+                    self.expecting_ack_map[ rx_data[idx] ] = False
+                    idx = idx+1 #place index for next data
+
+                case MSG_UPDATE_ID:
+                    idx = idx + 1
+                    new_rnd = rx_data[idx]
+                    self.__round_update()
+                    if new_rnd != self.current_round:
+                        print("Missing RX? New Round Requested out of order")
+                        self.current_round = new_rnd
+
+                    idx = idx+1 #place index for next data
+
+                case _:
+                    idx = idx + self.__data_rx_handler( rx_data[idx+1:], data_type )
+
+    def __data_rx_handler( self, data, idx ):
+        #note data can be larger than needed
+        data_var, rate, flag, dir, src, dest = self.mailbox_map[ idx ]
+
+        flag = True
+
+        match( data_var ):
+            case int():
+                data_var = int( (data[0] << 24 ) | (data[1] << 16) | (data[2] << 8) | data[3] )
+                return 5 #msg size
+            
+            case bool():
+                data_var = bool( data[0] )
+                return 2 #msg size
+            
+            case float():
+                raise( NotImplementedError )
+                data_var = np.float32(data)
+                return 5 #msg size
+            case _:
+                print(" unsupported data type")
 
 #---------------------------------------------------------------------
 #                               MAIN
@@ -141,10 +227,11 @@ def main():
                             chip_select = 0, 
                             currentModule = 0x00, 
                             listOfModules=[0x00,0x01,0x02] )
-    mailbox = Mailbox_manager( msg_conn )
+    mailbox = Mailbox( msg_conn )
 
     while( True ):
-
+        #run every 10ms
+        mailbox.mailbox_runtime()
 #---------------------------------------------------------------------
 #                              RUN
 #---------------------------------------------------------------------
