@@ -48,6 +48,7 @@ class messageAPI:
 	def __init__(self, bus, chip_select, currentModule, listOfModules):
 		#setup local var's
 		self.currentModule = currentModule
+		self.module_all    = len(listOfModules) + 1
 		self.listOfModules = listOfModules
 		self.version_num = 2
 		self.curr_key = 0x00
@@ -134,7 +135,7 @@ class messageAPI:
 			# Byte 5 -- start of data region
 			# Byte X -- crc (last byte)
 			destination = return_msg[0]
-			if destination != self.currentModule:
+			if destination != self.currentModule and destination != self.module_all:
 				return False, 0xFF, [], True
 
 			source = return_msg[1]
@@ -225,7 +226,7 @@ class messageAPI:
 			curr_msg = message[start_index:(start_index + 6 + dataSize)]
 
 			destination = curr_msg[0]
-			if destination == self.currentModule:
+			if destination == self.currentModule or destination == self.module_all:
 				source = curr_msg[1]
 				version = ( curr_msg[3] & 0xF0 ) >> 4
 				key = curr_msg[4]
@@ -466,16 +467,3 @@ class messageAPI:
 				print(hex(x),end =" ")
 			print("}")
 
-
-
-
-#Test API
-#module = messageAPI( bus=0, chip_select=0, currentModule=0x00, listOfModules=[0x00,0x01] )
-#module.InitAPI()
-#module.TXMessage( message=[0x11,0x22,0x33], destination=0x01 )
-
-#while True:
-#	return_tpl = module.RXMessage()
-#	if return_tpl[0] == True:
-#		print("source:", return_tpl[1], "data recvied: ", return_tpl[2]," valid: ", return_tpl[3] )
-#
