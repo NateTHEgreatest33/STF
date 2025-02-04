@@ -11,15 +11,24 @@
 #*********************************************************************
 
 #---------------------------------------------------------------------
+#                              DEBUG
+#--------------------------------------------------------------------- 
+Debug = False
+
+#---------------------------------------------------------------------
 #                              IMPORTS
 #--------------------------------------------------------------------- 
 import time
-import numpy as np # required for float32
 from enum import IntEnum
 
-# from msgAPI import messageAPI
-from util.msgAPI_sim import messageAPI
+# needed for float32
+import numpy as np
+import struct
 
+if Debug:
+    from util.msgAPI_sim import messageAPI
+else:
+    from msgAPI import messageAPI
 
 #---------------------------------------------------------------------
 #                              CONSTANTS
@@ -75,7 +84,7 @@ class Mailbox():
         # current module (ourself). However for
         # testing we can manage multiple modules
 		# ------------------------------------
-        self.manage_list       = [ msg_conn.currentModule ] if manage_lst is None else manage_lst
+        self.manage_list = [ msg_conn.currentModule ] if manage_lst is None else manage_lst
         if manage_lst != None:
             # we need to make changes to msgAPI to provide destination data before we can implement here
             raise( NotImplementedError )
@@ -321,7 +330,8 @@ class Mailbox():
             # --------------------------------
             case float():
                 temp_data = np.float32(data)
-                return [ idx, (temp_data >> 24 ), ((temp_data >> 16) & 0x000000FF), ((temp_data >> 8) & 0x000000FF), (temp_data & 0x000000FF)]
+                hex_str = hex(struct.unpack('<I', struct.pack('<f', temp_data))[0])
+                return [ idx, int(hex_str[2:4], 16), int(hex_str[4:6], 16), int(hex_str[6:8], 16), int(hex_str[8:10], 16)]
             # --------------------------------
             # Default case
             # --------------------------------
@@ -366,15 +376,18 @@ class Mailbox():
                     self.expecting_ack_map[ rx_data[idx] ] = False
                     idx = idx+1 # place index for next data
                 # ----------------------------
-                # UPDATE Handling
+                # UPDATE Handling. We dont have
+                # to worry about a self update
+                # w/ dest ALL because we cannot
+                # TX and RX at the same time
                 # ----------------------------
                 case special_response.MSG_UPDATE_ID:
-                    raise( NotImplementedError )
                     idx = idx + 1 
                     new_rnd = rx_data[idx]
                     self.__round_update()
+
                     if new_rnd != self.current_round:
-                        print("Missing RX? New Round Requested out of order") #ISSUE! what happens when instead of being by itself its in a dest ALL packet, we will reach here
+                        print("Missing RX? New Round Requested out of order")
                         self.current_round = new_rnd
 
                     idx = idx+1 #place index for next data
@@ -420,10 +433,17 @@ class Mailbox():
             
             # --------------------------------
             # FLOAT -- 4 bytes + idx byte = 5
+            #
+            # This logic works due to all 
+            # processors in the chain being
+            # little endian. This would need
+            # to be reworked if one isn't
             # --------------------------------
             case float():
-                raise( NotImplementedError )
-                data_var = np.float32(data)
+                #Pi pico + macOS + rPi 3B+ is little endian so this should still work correctlty                  <--- this NEEDS to be verified
+                raw_unit8_data = np.array(data[0:4], dtype='uint8')
+                rtn = raw_unit8_data.view('<f4') #cast into float32
+                data_var = rtn[0]
                 return 5 # msg size
             
             # --------------------------------
@@ -449,22 +469,22 @@ def main():
         #run every 10ms
         time.sleep(.5)    
         mailbox.mailbox_runtime()
-        #force it to be an us round everytime
-        # mailbox.current_round = 0
 
-        ack_msg = [ int(special_response.ACK_ID), 0x02 ]
-        msg_conn.rx_data_fill(src=int(modules.RPI_MODULE), data=ack_msg, validity=True)
+        if Debug:
+            #Pretend to send acks from other unit
+            ack_msg = [ int(special_response.ACK_ID), 0x02 ]
+            msg_conn.rx_data_fill(src=int(modules.RPI_MODULE), data=ack_msg, validity=True)
 
 
-        #send data to be acked
-        #note bc we send 2x for every tx_runtime we need to ack 2-3 times
-        msg_to_ack = [ 0, 0, 0, 0, 1] #data from index 1
-        msg_conn.rx_data_fill(src=int(modules.PICO_MODULE), data=msg_to_ack, validity=True)
+            #send data to be acked
+            #note bc we send 2x for every tx_runtime we need to ack 2-3 times
+            msg_to_ack = [ 0, 0, 0, 0, 1] #data from index 1
+            msg_conn.rx_data_fill(src=int(modules.PICO_MODULE), data=msg_to_ack, validity=True)
 
-        #update rounds
-        new_rnd = (mailbox.current_round + 1 )% modules.NUM_MODULES
-        round_update_msg= [ int(special_response.MSG_UPDATE_ID), new_rnd ]
-        msg_conn.rx_data_fill(src=int(modules.RPI_MODULE), data=round_update_msg, validity=True)
+            #update round command
+            new_rnd = (mailbox.current_round + 1 )% modules.NUM_MODULES
+            round_update_msg= [ int(special_response.MSG_UPDATE_ID), new_rnd ]
+            msg_conn.rx_data_fill(src=int(modules.RPI_MODULE), data=round_update_msg, validity=True)
 
 
 #---------------------------------------------------------------------
