@@ -208,55 +208,45 @@ class Mailbox():
 		# Loop through TX queue
 		# ------------------------------------
         for data_type, data_idx in self.tx_queue:
-            # --------------------------------
-            # Switch case based upon TX type
-            # --------------------------------
-            match data_type:
-                # ----------------------------
-                # Data Type
-                # ----------------------------
-                case 'data':
-                    data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
-                    data_size = 1 if type(data_var) is bool else 4
-                    data_dest = dest
+            # ----------------------------
+            # Data Type
+            # ----------------------------
+            if data_type == 'data':
+                data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
+                data_size = 1 if type(data_var) is bool else 4
+                data_dest = dest
 
-                    # ------------------------
-                    # Because u32, flt and bool
-                    # are formatted differently
-                    # in binary, we need to
-                    # handle formatting
-                    # ------------------------
-                    data_formated = self.__data_type_handler( data_var, data_idx )
+                # ------------------------
+                # Because u32, flt and bool
+                # are formatted differently
+                # in binary, we need to
+                # handle formatting
+                # ------------------------
+                data_formated = self.__data_type_handler( data_var, data_idx )
 
-                # ----------------------------
-                # Ack Type
-                # ----------------------------
-                case 'ack':
-                    data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
-                    data_size = 1
-                    data_dest = src
+            # ----------------------------
+            # Ack Type
+            # ----------------------------
+            if data_type == 'ack':
+                data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
+                data_size = 1
+                data_dest = src
 
-                    data_formated = [ACK_ID, data_idx]
+                data_formated = [ACK_ID, data_idx]
 
-                # ----------------------------
-                # Round Update Type
-                # ----------------------------
-                case 'round':
-                    data_size = 1
-                    data_dest = modules.MODULE_ALL
-                    # ------------------------
-                    # Updates the current round
-                    # and handles rollover
-                    # ------------------------
-                    self.__round_update()
+            # ----------------------------
+            # Round Update Type
+            # ----------------------------
+            if data_type == 'round':
+                data_size = 1
+                data_dest = modules.MODULE_ALL
+                # ------------------------
+                # Updates the current round
+                # and handles rollover
+                # ------------------------
+                self.__round_update()
 
-                    data_formated = [ MSG_UPDATE_ID, self.current_round ]
-
-                # ----------------------------
-                # Default case error
-                # ----------------------------
-                case _:
-                    raise( "Incorrect data type" )
+                data_formated = [ MSG_UPDATE_ID, self.current_round ]
 
             # --------------------------------
             # Update destination based upon:
@@ -311,32 +301,23 @@ class Mailbox():
     #       bools into uint8 list
     # ==================================	
     def __data_type_handler( self, data, idx ):
-		# ------------------------------------
-		# switch based upon data type of data
-		# ------------------------------------
-        match( data ):
-            # --------------------------------
-            # integer
-            # --------------------------------
-            case int():
-                return [ idx, (data >> 24 ), ((data >> 16) & 0x000000FF), ((data >> 8) & 0x000000FF), (data & 0x000000FF)]
-            # --------------------------------
-            # bool
-            # --------------------------------
-            case bool():
-                return [ idx, int(data) ]
-            # --------------------------------
-            # float
-            # --------------------------------
-            case float():
-                temp_data = np.float32(data)
-                hex_str = hex(struct.unpack('<I', struct.pack('<f', temp_data))[0])
-                return [ idx, int(hex_str[2:4], 16), int(hex_str[4:6], 16), int(hex_str[6:8], 16), int(hex_str[8:10], 16)]
-            # --------------------------------
-            # Default case
-            # --------------------------------
-            case _:
-                print(" unsupported data type")
+        # --------------------------------
+        # integer
+        # --------------------------------
+        if data == int():
+            return [ idx, (data >> 24 ), ((data >> 16) & 0x000000FF), ((data >> 8) & 0x000000FF), (data & 0x000000FF)]
+        # --------------------------------
+        # bool
+        # --------------------------------
+        if data == bool():
+            return [ idx, int(data) ]
+        # --------------------------------
+        # float
+        # --------------------------------
+        if data == float():
+            temp_data = np.float32(data)
+            hex_str = hex(struct.unpack('<I', struct.pack('<f', temp_data))[0])
+            return [ idx, int(hex_str[2:4], 16), int(hex_str[4:6], 16), int(hex_str[6:8], 16), int(hex_str[8:10], 16)]
 
 	# ==================================
     # __round_update() 
@@ -367,36 +348,36 @@ class Mailbox():
             # or ROUND update
             # --------------------------------
             data_type = rx_data[idx]
-            match( data_type ):
-                # ----------------------------
-                # ACK Handling
-                # ----------------------------
-                case special_response.ACK_ID:
-                    idx = idx + 1
-                    self.expecting_ack_map[ rx_data[idx] ] = False
-                    idx = idx+1 # place index for next data
-                # ----------------------------
-                # UPDATE Handling. We dont have
-                # to worry about a self update
-                # w/ dest ALL because we cannot
-                # TX and RX at the same time
-                # ----------------------------
-                case special_response.MSG_UPDATE_ID:
-                    idx = idx + 1 
-                    new_rnd = rx_data[idx]
-                    self.__round_update()
 
-                    if new_rnd != self.current_round:
-                        print("Missing RX? New Round Requested out of order")
-                        self.current_round = new_rnd
+            # ----------------------------
+            # ACK Handling
+            # ----------------------------
+            if data_type == special_response.ACK_ID:
+                idx = idx + 1
+                self.expecting_ack_map[ rx_data[idx] ] = False
+                idx = idx+1 # place index for next data
+            # ----------------------------
+            # UPDATE Handling. We dont have
+            # to worry about a self update
+            # w/ dest ALL because we cannot
+            # TX and RX at the same time
+            # ----------------------------
+            elif data_type == special_response.MSG_UPDATE_ID:
+                idx = idx + 1 
+                new_rnd = rx_data[idx]
+                self.__round_update()
 
-                    idx = idx+1 #place index for next data
-                # ----------------------------
-                # DATA/Default Handling
-                # ----------------------------
-                case _:
-                    idx = idx + self.__data_rx_handler( rx_data[idx+1:], data_type )
-                    self.tx_queue.append( [ 'ack', data_type ] ) 
+                if new_rnd != self.current_round:
+                    print("Missing RX? New Round Requested out of order")
+                    self.current_round = new_rnd
+
+                idx = idx+1 #place index for next data
+            # ----------------------------
+            # DATA/Default Handling
+            # ----------------------------
+            else:
+                idx = idx + self.__data_rx_handler( rx_data[idx+1:], data_type )
+                self.tx_queue.append( [ 'ack', data_type ] ) 
 
 	# ==================================
     # __data_rx_handler() 
@@ -412,45 +393,36 @@ class Mailbox():
 		# ------------------------------------
         flag = True
 
-		# ------------------------------------
-		# switch based upon data type and how
-        # to reconstruct data
-		# ------------------------------------
-        match( data_var ):
-            # --------------------------------
-            # INT -- 4 bytes + idx byte = 5
-            # --------------------------------
-            case int():
-                data_var = int( (data[0] << 24 ) | (data[1] << 16) | (data[2] << 8) | data[3] )
-                return 5 # msg size
-            
-            # --------------------------------
-            # BOOL -- 1 byte + idx byte = 2
-            # --------------------------------
-            case bool():
-                data_var = bool( data[0] )
-                return 2 # msg size
-            
-            # --------------------------------
-            # FLOAT -- 4 bytes + idx byte = 5
-            #
-            # This logic works due to all 
-            # processors in the chain being
-            # little endian. This would need
-            # to be reworked if one isn't
-            # --------------------------------
-            case float():
-                #Pi pico + macOS + rPi 3B+ is little endian so this should still work correctlty                  <--- this NEEDS to be verified
-                raw_unit8_data = np.array(data[0:4], dtype='uint8')
-                rtn = raw_unit8_data.view('<f4') #cast into float32
-                data_var = rtn[0]
-                return 5 # msg size
-            
-            # --------------------------------
-            # DEFAULT
-            # --------------------------------
-            case _:
-                print(" unsupported data type")
+
+        # --------------------------------
+        # INT -- 4 bytes + idx byte = 5
+        # --------------------------------
+        if data_var == int():
+            data_var = int( (data[0] << 24 ) | (data[1] << 16) | (data[2] << 8) | data[3] )
+            return 5 # msg size
+        
+        # --------------------------------
+        # BOOL -- 1 byte + idx byte = 2
+        # --------------------------------
+        if data_var == bool():
+            data_var = bool( data[0] )
+            return 2 # msg size
+        
+        # --------------------------------
+        # FLOAT -- 4 bytes + idx byte = 5
+        #
+        # This logic works due to all 
+        # processors in the chain being
+        # little endian. This would need
+        # to be reworked if one isn't
+        # --------------------------------
+        if data_var == float():
+            #Pi pico + macOS + rPi 3B+ is little endian so this should still work correctlty                  <--- this NEEDS to be verified
+            raw_unit8_data = np.array(data[0:4], dtype='uint8')
+            rtn = raw_unit8_data.view('<f4') #cast into float32
+            data_var = rtn[0]
+            return 5 # msg size
+
 
 #---------------------------------------------------------------------
 #                               MAIN
