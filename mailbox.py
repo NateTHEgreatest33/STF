@@ -442,6 +442,9 @@ def main():
         time.sleep(.5)    
         mailbox.mailbox_runtime()
 
+        #realtime debug help
+        mailbox.current_round = 0 
+
         if Debug:
             #Pretend to send acks from other unit
             ack_msg = [ int(special_response.ACK_ID), 0x02 ]
