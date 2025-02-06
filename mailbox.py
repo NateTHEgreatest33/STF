@@ -14,7 +14,7 @@
 #                              DEBUG
 #--------------------------------------------------------------------- 
 Debug = False
-
+Debug_hw = True
 #---------------------------------------------------------------------
 #                              IMPORTS
 #--------------------------------------------------------------------- 
@@ -323,6 +323,10 @@ class Mailbox():
     # __round_update() 
     # ==================================	
     def __round_update( self ):
+        if Debug_hw:
+            self.current_round = int(modules.PICO_MODULE)
+            return
+
 		# ------------------------------------
 		# Update current round & account for
         # rollovers
@@ -439,11 +443,11 @@ def main():
 
     while( True ):
         #run every 10ms
-        time.sleep(.5)    
+        time.sleep(10.5)    
         mailbox.mailbox_runtime()
 
         #realtime debug help
-        mailbox.current_round = 0 
+        # mailbox.current_round = 0 
 
         if Debug:
             #Pretend to send acks from other unit

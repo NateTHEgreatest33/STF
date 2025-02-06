@@ -77,7 +77,7 @@ class messageAPI:
 		if( message_size > 10):
 			#message is too large to send, return false
 			return False
-		if( destination not in self.listOfModules and destination not self.module_all ):
+		if( destination not in self.listOfModules and destination != self.module_all ):
 			return False
 
 		version_size_var = (self.version_num << 4 ) | message_size
