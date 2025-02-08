@@ -13,7 +13,7 @@
 #---------------------------------------------------------------------
 #                              DEBUG
 #--------------------------------------------------------------------- 
-Debug = False
+Debug = True
 Debug_hw = True
 #---------------------------------------------------------------------
 #                              IMPORTS
@@ -51,6 +51,14 @@ class special_response(IntEnum):
     ACK_ID = 0xFF
     MSG_UPDATE_ID = 0xFE
 
+class mailbox_idx(IntEnum):
+    DATA = 0
+    RATE = 1
+    FLAG = 2
+    DIR  = 3
+    SRC  = 4
+    DEST = 5
+
 #---------------------------------------------------------------------
 #                              VARIABLES
 #--------------------------------------------------------------------- 
@@ -58,7 +66,8 @@ global_mailbox = [
 # data, type,   flag,  dir,  src,                    dest
 [ 0,   'ASYNC', False, 'RX', modules.RPI_MODULE,  modules.PICO_MODULE ],
 [ 0.0, '1',     False, 'TX', modules.PICO_MODULE, modules.RPI_MODULE  ],
-[ 0,   '5',     False, 'TX', modules.RPI_MODULE,  modules.PICO_MODULE ],
+[ 0,   '5',     False, 'TX', modules.RPI_MODULE,  modules.PICO_MODULE ], 
+[ 0.0, '5',     False, 'TX', modules.RPI_MODULE,  modules.PICO_MODULE ],
  ]
 
 #---------------------------------------------------------------------
@@ -304,20 +313,21 @@ class Mailbox():
         # --------------------------------
         # integer
         # --------------------------------
-        if data == int():
+        if type(data) == type(int()):
             return [ idx, (data >> 24 ), ((data >> 16) & 0x000000FF), ((data >> 8) & 0x000000FF), (data & 0x000000FF)]
         # --------------------------------
         # bool
         # --------------------------------
-        if data == bool():
+        if type(data) == type(bool()):
             return [ idx, int(data) ]
         # --------------------------------
         # float
         # --------------------------------
-        if data == float():
+        if type(data) == type(float()):
             temp_data = np.float32(data)
             hex_str = hex(struct.unpack('<I', struct.pack('<f', temp_data))[0])
-            return [ idx, int(hex_str[2:4], 16), int(hex_str[4:6], 16), int(hex_str[6:8], 16), int(hex_str[8:10], 16)]
+            int_representation = int( hex_str, 16 )
+            return [ idx, (int_representation >> 24 ), ((int_representation >> 16) & 0x000000FF), ((int_representation >> 8) & 0x000000FF), (int_representation & 0x000000FF)]
 
 	# ==================================
     # __round_update() 
@@ -397,19 +407,18 @@ class Mailbox():
 		# ------------------------------------
         flag = True
 
-
         # --------------------------------
         # INT -- 4 bytes + idx byte = 5
         # --------------------------------
-        if data_var == int():
-            data_var = int( (data[0] << 24 ) | (data[1] << 16) | (data[2] << 8) | data[3] )
+        if type(data_var) == type(int()):
+            self.mailbox_map[ idx ][mailbox_idx.DATA] = int( (data[0] << 24 ) | (data[1] << 16) | (data[2] << 8) | data[3] )
             return 5 # msg size
         
         # --------------------------------
         # BOOL -- 1 byte + idx byte = 2
         # --------------------------------
-        if data_var == bool():
-            data_var = bool( data[0] )
+        if type(data_var) == type(bool()):
+            self.mailbox_map[ idx ][mailbox_idx.DATA] = bool( data[0] )
             return 2 # msg size
         
         # --------------------------------
@@ -420,13 +429,25 @@ class Mailbox():
         # little endian. This would need
         # to be reworked if one isn't
         # --------------------------------
-        if data_var == float():
+        if type(data_var) == type(float()):
             #Pi pico + macOS + rPi 3B+ is little endian so this should still work correctlty                  <--- this NEEDS to be verified
             raw_unit8_data = np.array(data[0:4], dtype='uint8')
             rtn = raw_unit8_data.view('<f4') #cast into float32
-            data_var = rtn[0]
+            self.mailbox_map[ idx ][mailbox_idx.DATA] = float(rtn[0])
             return 5 # msg size
+        
+        raise( "Data type is not supported, have we currupted our mailbox map?" )
 
+    def set_data( self, data, idx ):
+        if self.mailbox_map[idx][mailbox_idx.SRC] not in self.manage_list:
+            return False
+
+        if type(self.mailbox_map[idx][mailbox_idx.DATA]) != type( data ):
+            return False
+        
+        self.mailbox_map[idx][mailbox_idx.DATA] = data
+        self.mailbox_map[idx][mailbox_idx.FLAG] = True
+        return True
 
 #---------------------------------------------------------------------
 #                               MAIN
@@ -443,11 +464,13 @@ def main():
 
     while( True ):
         #run every 10ms
-        time.sleep(10.5)    
+        time.sleep(10)    
         mailbox.mailbox_runtime()
 
         #realtime debug help
         # mailbox.current_round = 0 
+
+        mailbox.set_data( 5.5, 3 )
 
         if Debug:
             #Pretend to send acks from other unit
