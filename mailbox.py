@@ -13,7 +13,7 @@
 #---------------------------------------------------------------------
 #                              DEBUG
 #--------------------------------------------------------------------- 
-Debug = True
+Debug = False
 Debug_hw = True
 #---------------------------------------------------------------------
 #                              IMPORTS
@@ -106,6 +106,7 @@ class Mailbox():
 		# Call Rx and Tx Functions
 		# ------------------------------------
         self.rx_runtime()
+        time.sleep(.5)
         self.tx_runtime()
 
 
@@ -464,7 +465,7 @@ def main():
 
     while( True ):
         #run every 10ms
-        time.sleep(10)    
+        time.sleep(2)    
         mailbox.mailbox_runtime()
 
         #realtime debug help
