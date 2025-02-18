@@ -45,11 +45,10 @@ MSG_UPDATE_ID = 0xFE
 #--------------------------------------------------------------------- 
 class modules(IntEnum):
     RPI_MODULE  = 0
-    TIVA_MODULE = 1    
-    PICO_MODULE = 2
+    PICO_MODULE = 1
 
-    NUM_MODULES = 3
-    MODULE_ALL  = 4
+    NUM_MODULES = 2
+    MODULE_ALL  = 3
 
 class special_response(IntEnum):
     ACK_ID = 0xFF
@@ -300,7 +299,7 @@ class Mailbox():
 		# Run this one last time incase we have
         # a half full message upon exit.
 		# ------------------------------------
-        if len(msg_data) != 0:
+        if len(msg_data) > 0:
             self.msg_conn.TXMessage( msg_data, msg_dest )
 
 		# ------------------------------------

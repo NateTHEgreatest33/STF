@@ -76,6 +76,7 @@ class messageAPI:
 		message_size = len(message)
 		if( message_size > 10):
 			#message is too large to send, return false
+			print("message greater than size 10, not sending")
 			return False
 		if( destination not in self.listOfModules and destination != self.module_all ):
 			return False
