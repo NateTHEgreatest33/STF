@@ -13,8 +13,9 @@
 #---------------------------------------------------------------------
 #                              DEBUG
 #--------------------------------------------------------------------- 
-Debug = False
-Debug_hw = True
+Debug      = False #debug just this file (imports + main function)
+Debug_test = False #if we have imported this from a system test but want to run fake msgAPI
+Debug_hw   = False #force skip TIVA board
 #---------------------------------------------------------------------
 #                              IMPORTS
 #--------------------------------------------------------------------- 
@@ -25,8 +26,11 @@ from enum import IntEnum
 import numpy as np
 import struct
 
-if Debug:
-    from util.msgAPI_sim import messageAPI
+#only do this to fix imports
+if Debug_test:
+    from lib.util.msgAPI_sim import messageAPI
+elif Debug:
+    from util.msgAPI_sim import messageAPI 
 else:
     from msgAPI import messageAPI
 
@@ -101,7 +105,7 @@ class Mailbox():
 	# ==================================
     # mailbox_runtime() 
     # ==================================	
-    def mailbox_runtime( self ):
+    def runtime( self ):
 		# ------------------------------------
 		# Call Rx and Tx Functions
 		# ------------------------------------
@@ -466,7 +470,7 @@ def main():
     while( True ):
         #run every 10ms
         time.sleep(2)    
-        mailbox.mailbox_runtime()
+        mailbox.runtime()
 
         #realtime debug help
         # mailbox.current_round = 0 
