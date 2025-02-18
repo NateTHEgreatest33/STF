@@ -32,7 +32,7 @@ if Debug_test:
 elif Debug:
     from util.msgAPI_sim import messageAPI 
 else:
-    from msgAPI import messageAPI
+    from lib.msgAPI import messageAPI
 
 #---------------------------------------------------------------------
 #                              CONSTANTS
