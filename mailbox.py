@@ -13,9 +13,10 @@
 #---------------------------------------------------------------------
 #                              DEBUG
 #--------------------------------------------------------------------- 
-Debug      = False #debug just this file (imports + main function)
-Debug_test = False #if we have imported this from a system test but want to run fake msgAPI
-Debug_hw   = False #force skip TIVA board
+Debug        = False #debug just this file (imports + main function)
+Debug_test   = False #if we have imported this from a system test but want to run fake msgAPI
+Debug_hw     = False #force skip TIVA board
+Debug_prints = True 
 #---------------------------------------------------------------------
 #                              IMPORTS
 #--------------------------------------------------------------------- 
@@ -318,7 +319,9 @@ class Mailbox():
         # integer
         # --------------------------------
         if type(data) == type(int()):
-            return [ idx, (data >> 24 ), ((data >> 16) & 0x000000FF), ((data >> 8) & 0x000000FF), (data & 0x000000FF)]
+            temp_arr =  [ idx, (data >> 24 ), ((data >> 16) & 0x000000FF), ((data >> 8) & 0x000000FF), (data & 0x000000FF)]
+            #fix direction packing
+            return [ idx, temp_arr[4], temp_arr[3], temp_arr[2], temp_arr[1] ]
         # --------------------------------
         # bool
         # --------------------------------
@@ -331,7 +334,10 @@ class Mailbox():
             temp_data = np.float32(data)
             hex_str = hex(struct.unpack('<I', struct.pack('<f', temp_data))[0])
             int_representation = int( hex_str, 16 )
-            return [ idx, (int_representation >> 24 ), ((int_representation >> 16) & 0x000000FF), ((int_representation >> 8) & 0x000000FF), (int_representation & 0x000000FF)]
+            
+            temp_arr = [ idx, (int_representation >> 24 ), ((int_representation >> 16) & 0x000000FF), ((int_representation >> 8) & 0x000000FF), (int_representation & 0x000000FF)]
+            #fix direction packing
+            return [ idx, temp_arr[4], temp_arr[3], temp_arr[2], temp_arr[1] ]
 
 	# ==================================
     # __round_update() 
@@ -415,6 +421,7 @@ class Mailbox():
         # INT -- 4 bytes + idx byte = 5
         # --------------------------------
         if type(data_var) == type(int()):
+            data.reverse()
             self.mailbox_map[ idx ][mailbox_idx.DATA] = int( (data[0] << 24 ) | (data[1] << 16) | (data[2] << 8) | data[3] )
             return 5 # msg size
         
@@ -434,6 +441,7 @@ class Mailbox():
         # to be reworked if one isn't
         # --------------------------------
         if type(data_var) == type(float()):
+            data.reverse()
             #Pi pico + macOS + rPi 3B+ is little endian so this should still work correctlty                  <--- this NEEDS to be verified
             raw_unit8_data = np.array(data[0:4], dtype='uint8')
             rtn = raw_unit8_data.view('<f4') #cast into float32
