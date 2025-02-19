@@ -466,7 +466,7 @@ class Mailbox():
 
     def debug_prints( self, dir, data ):
         dir_text = "Sending" if dir == 'TX' else "Receiving:"
-        print( "{}: ", end="")
+        print( "{}: ".format(dir_text), end="")
 
         # ----------------------------------------
         # Rough copy of __parse_rx()
@@ -512,7 +512,7 @@ class Mailbox():
                 # DATA/Default Handling
                 # ----------------------------
                 else:
-                    data_sz = ( 1 if type( self.mailbox_map[mailbox_idx.DATA]) is bool else 4 )
+                    data_sz = ( 1 if type( self.mailbox_map[data_type][mailbox_idx.DATA]) is bool else 4 )
                     print( "[DATA - {}] - ".format( hex(data_type)), end="" )
                     idx = idx + 1
                     for i in range( data_sz):
@@ -572,7 +572,7 @@ class Mailbox():
                 # ----------------------------
                 if data_type == 'round':
                     data_formated = [ MSG_UPDATE_ID, self.current_round ]
-                    print( "[RND] - "., end="" )
+                    print( "[RND] - ", end="" )
                     for d in data_formated:
                         print( "{} ".format( hex(d)), end="")
                     print("| ", end="")
