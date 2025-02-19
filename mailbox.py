@@ -149,6 +149,7 @@ class Mailbox():
                 # -----------------------------
                 # Parse raw MsgAPI
                 # -----------------------------
+                self.debug_prints(dir='RX', data=rx_data)
                 self.__parse_rx( rx_data )
 
 	# ==================================
@@ -197,6 +198,7 @@ class Mailbox():
 		# ------------------------------------
 		# Pack and send Tx queue
 		# ------------------------------------
+        self.debug_prints(dir='TX',data=[])
         self.__msg_interface_pack_and_send()
 
 		# ------------------------------------
@@ -460,6 +462,122 @@ class Mailbox():
         self.mailbox_map[idx][mailbox_idx.DATA] = data
         self.mailbox_map[idx][mailbox_idx.FLAG] = True
         return True
+    
+
+    def debug_prints( self, dir, data ):
+        dir_text = "Sending" if dir == 'TX' else "Receiving:"
+        print( "{}: ", end="")
+
+        # ----------------------------------------
+        # Rough copy of __parse_rx()
+        # ----------------------------------------
+        if dir == 'RX':
+            # ------------------------------------
+            # setup variables
+            # ------------------------------------
+            idx = 0
+            # ------------------------------------
+            # Loop through each index in rx_data
+            # ------------------------------------
+            while idx < len( data):
+                # --------------------------------
+                # aquire first byte and switch 
+                # based upon if it is an ACK, DATA,
+                # or ROUND update
+                # --------------------------------
+                data_type = data[idx]
+
+                # ----------------------------
+                # ACK Handling
+                # ----------------------------
+                if data_type == special_response.ACK_ID:
+                    idx = idx + 1
+                    print( "[ACK] - {} | ".format( hex(idx)), end="" )
+                    self.expecting_ack_map[ data[idx] ] = False
+
+                    idx = idx+1 # place index for next data
+                # ----------------------------
+                # UPDATE Handling. We dont have
+                # to worry about a self update
+                # w/ dest ALL because we cannot
+                # TX and RX at the same time
+                # ----------------------------
+                elif data_type == special_response.MSG_UPDATE_ID:
+                    idx = idx + 1 
+                    new_rnd = data[idx]
+                    print( "[RND] - {} | ".format( hex(new_rnd)), end="" )
+
+                    idx = idx+1 #place index for next data
+                # ----------------------------
+                # DATA/Default Handling
+                # ----------------------------
+                else:
+                    data_sz = ( 1 if type( self.mailbox_map[mailbox_idx.DATA]) is bool else 4 )
+                    print( "[DATA - {}] - ".format( hex(data_type)), end="" )
+                    idx = idx + 1
+                    for i in range( data_sz):
+                        print( "{} ".format( hex( data[idx]) ), end="" )
+                        idx = idx + 1
+
+                    print("| ", end="")
+
+
+        # ----------------------------------------
+        # Rough copy of __pack_tx()
+        # ----------------------------------------
+        if dir == 'TX':
+            # ------------------------------------
+            # setup local variables
+            # ------------------------------------
+            msg_data = []
+            msg_dest = None
+
+            # ------------------------------------
+            # Loop through TX queue
+            # ------------------------------------
+            for data_type, data_idx in self.tx_queue:
+                # ----------------------------
+                # Data Type
+                # ----------------------------
+                if data_type == 'data':
+                    data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
+
+                    # ------------------------
+                    # Because u32, flt and bool
+                    # are formatted differently
+                    # in binary, we need to
+                    # handle formatting
+                    # ------------------------
+                    data_formated = self.__data_type_handler( data_var, data_idx )
+                    print( "[DATA - {}] - ".format( hex(data_idx)), end="" )
+                    for d in data_formated:
+                        print( "{} ".format( hex(d)), end="")
+                    print("| ", end="")
+                # ----------------------------
+                # Ack Type
+                # ----------------------------
+                if data_type == 'ack':
+                    data_var, rate, flag, dir, src, dest = self.mailbox_map[data_idx]
+                    data_size = 1
+                    data_dest = src
+
+                    data_formated = [ACK_ID, data_idx]
+                    print( "[ACK - {}] - ".format( hex(data_idx)), end="" )
+                    for d in data_formated:
+                        print( "{} ".format( hex(d)), end="")
+                    print("| ", end="")
+
+                # ----------------------------
+                # Round Update Type
+                # ----------------------------
+                if data_type == 'round':
+                    data_formated = [ MSG_UPDATE_ID, self.current_round ]
+                    print( "[RND] - "., end="" )
+                    for d in data_formated:
+                        print( "{} ".format( hex(d)), end="")
+                    print("| ", end="")
+   
+        print("") #add \n
 
 #---------------------------------------------------------------------
 #                               MAIN
