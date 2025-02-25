@@ -423,7 +423,8 @@ class Mailbox():
         # INT -- 4 bytes + idx byte = 5
         # --------------------------------
         if type(data_var) == type(int()):
-            data.reverse()
+            data = data[0:4]
+            data.reverse() #cannot call this here bc array is [idx:->end]
             self.mailbox_map[ idx ][mailbox_idx.DATA] = int( (data[0] << 24 ) | (data[1] << 16) | (data[2] << 8) | data[3] )
             return 5 # msg size
         
@@ -443,6 +444,7 @@ class Mailbox():
         # to be reworked if one isn't
         # --------------------------------
         if type(data_var) == type(float()):
+            data = data[0:4]
             data.reverse()
             #Pi pico + macOS + rPi 3B+ is little endian so this should still work correctlty                  <--- this NEEDS to be verified
             raw_unit8_data = np.array(data[0:4], dtype='uint8')
