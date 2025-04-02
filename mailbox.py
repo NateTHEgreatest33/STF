@@ -467,7 +467,7 @@ class Mailbox():
     
 
     def debug_prints( self, dir, data ):
-        dir_text = "Sending" if dir == 'TX' else "Receiving:"
+        dir_text = "Sending" if dir == 'TX' else "Receiving"
         print( "{}: ".format(dir_text), end="")
 
         # ----------------------------------------
@@ -493,8 +493,8 @@ class Mailbox():
                 # ACK Handling
                 # ----------------------------
                 if data_type == special_response.ACK_ID:
-                    idx = idx + 1
-                    print( "[ACK] - {} | ".format( hex(idx)), end="" )
+                    idx = idx + 1 #go to next byte 
+                    print( "[ACK] - {} | ".format( hex(data[idx])), end="" )
                     self.expecting_ack_map[ data[idx] ] = False
 
                     idx = idx+1 # place index for next data
