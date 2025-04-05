@@ -30,7 +30,7 @@ class lora_serial:
     # ==================================
     # Constructor
     # ==================================
-	def __init__(self, port="/dev/tty.usbmodem11101", baud=115200 ):
+	def __init__(self, port="/dev/cu.usbmodem1101", baud=115200 ):
 		self.ser_conn = serial.Serial(port=port, baudrate=115200, timeout=0)
 		self.ser_conn.close()
 		self.ser_conn.open()
@@ -54,6 +54,9 @@ class lora_serial:
     # x()
     # ==================================
 	def __LoraReadMessageSingle(self):
+		return self.LoraReadMessageSingle()
+	
+	def LoraReadMessageSingle(self):
 		raise( NotImplemented )	
 
     # ==================================

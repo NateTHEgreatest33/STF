@@ -8,12 +8,20 @@
 #
 #   Copyright 2024 by Nate Lenze
 #*********************************************************************
+#---------------------------------------------------------------------
+#                              PC Flag
+#---------------------------------------------------------------------
+PC_TESTING = True
 
 #---------------------------------------------------------------------
 #                              IMPORTS
 #---------------------------------------------------------------------
+if( PC_TESTING ):
+	from lib.lora_over_serial import lora_serial
+else:
+	import spidev
 import time
-import spidev
+
 
 #---------------------------------------------------------------------
 #                             VARIABLES
@@ -55,11 +63,14 @@ class messageAPI:
 		self.debug_prints = True
 		self.last_fifo_idx = 0;
 
-		# Enable SPI
-		self.spi = spidev.SpiDev()
-		self.spi.open(bus, chip_select)
-		self.spi.max_speed_hz = 100000
-		self.spi.mode = 0
+		if( PC_TESTING ):
+			self.lora_serr_conn = lora_serial()
+		else:
+			# Enable SPI
+			self.spi = spidev.SpiDev()
+			self.spi.open(bus, chip_select)
+			self.spi.max_speed_hz = 100000
+			self.spi.mode = 0
 
     # ==================================
     # InitAPI()
@@ -162,20 +173,24 @@ class messageAPI:
     # RX_multi()
     # ==================================
 	def RX_Multi(self):
-		if self.__LoraCheckMessage() == True:
+		#handle Rx message
+		if( PC_TESTING ):
+			return_msg = self.lora_serr_conn.LoraReadMessageMulti()
+			if len(return_msg) == 0:
+				return None
+		else:
+			if self.__LoraCheckMessage() == False:
+				return None
 			return_msg = self.__LoraReadMessageMulti()
 
-			#print full message
-			if self.debug_prints:
-				print("Full message received: {",end =" ")
-				for x in return_msg:
-					print(hex(x),end = " ")
-				print("}")
+		#print full message
+		if self.debug_prints:
+			print("Full message received: {",end =" ")
+			for x in return_msg:
+				print(hex(x),end = " ")
+			print("}")
 
-			return self.__parseRawLora( return_msg )
-
-		else:
-			return None
+		return self.__parseRawLora( return_msg )
 
 
     # ==================================
@@ -313,7 +328,10 @@ class messageAPI:
     # __LoraReadMessageSingle()
     # ==================================
 	def __LoraReadMessageSingle(self):
-
+		#overwrite lora_send_msg depending on usecase
+		if( PC_TESTING):
+			return self.lora_serr_conn.LoraReadMessageSingle()
+			
 		#clear flag
 		msg = [0x80 | 0x12, 0xFF]
 		result = self.spi.xfer2(msg)
@@ -351,6 +369,10 @@ class messageAPI:
     # __LoraReadMessageMulti()
     # ==================================
 	def __LoraReadMessageMulti(self):
+		#overwrite lora_send_msg depending on usecase
+		if( PC_TESTING):
+			return self.lora_serr_conn.LoraReadMessageMulti()
+		
 		#clear flag
 		msg = [0x80 | 0x12, 0xFF]
 		result = self.spi.xfer2(msg)
@@ -410,6 +432,11 @@ class messageAPI:
     # __LoraSetRxMode()
     # ==================================
 	def __LoraSetRxMode(self):
+		#overwrite lora_send_msg depending on usecase
+		if( PC_TESTING):
+			self.lora_serr_conn.LoraSetRxMode()
+			return
+		
 		msg = [0x80 | 0x01,0x80]
 		result = self.spi.xfer2(msg)
 
@@ -429,6 +456,11 @@ class messageAPI:
     # __LoraSendMessage()
     # ==================================
 	def __LoraSendMessage( self, messageList, messageSize):
+		#overwrite lora_send_msg depending on usecase
+		if( PC_TESTING):
+			self.lora_serr_conn.LoraSendMessage( messageList, messageSize)
+			return
+
 		msg = [0x80 | 0x01, 0x81]
 		result = self.spi.xfer2(msg)
 
