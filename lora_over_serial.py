@@ -22,6 +22,7 @@ import time
 #---------------------------------------------------------------------
 #                             VARIABLES
 #---------------------------------------------------------------------
+MAX_SER_TIMEOUT = 10  #in 1/10 of a sec, 10 = 1s
 
 #---------------------------------------------------------------------
 #                              CLASSES
@@ -35,7 +36,9 @@ class lora_serial:
 		self.ser_conn.close()
 		self.ser_conn.open()
 		self.ser_conn.flush()
-
+		self.send_cmd( "junkcmd" ) #clear out command buffer and flush
+		self.read_and_return()
+		self.glb_dbg = [] #allows you to see full response (helpful for debugging)
     # ==================================
     # x()
     # ==================================
@@ -87,8 +90,8 @@ class lora_serial:
 
 	def LoraSetRxMode(self):
 		self.send_cmd( "lora init rx" )
-		self.flush_buffer()
-		pass
+		self.read_and_return()
+		
 
     # ==================================
     # x()
@@ -109,9 +112,20 @@ class lora_serial:
     # ==================================
     # x()
     # ==================================
-	def read_and_return(self ):
-		time.sleep(.1) # allow buffer to fill in
-		response = self.ser_conn.read(10000).decode('utf-8').split("\r\n")
+	def read_and_return(self, ignore_full_response=False ):
+		response = self.ser_conn.read(10000).decode('utf-8') #.split("\r\n")
+		timeout_cnt = 0
+		if( ignore_full_response ):
+			return ['']
+		# wait for a full response to come in. This is signified 
+		# by 2x return lines: 1) orginal msg, 2) response 
+		while( response.count("\r\n") < 2 and timeout_cnt <= MAX_SER_TIMEOUT ):
+			time.sleep(.1)
+			timeout_cnt = timeout_cnt + 1 
+			response = response + self.ser_conn.read(10000).decode('utf-8') #.split("\r\n")
+		
+		response = response.split("\r\n")
+		self.glb_dbg = response
 		return response[1]
 
     # ==================================
@@ -126,9 +140,8 @@ class lora_serial:
     # x()
     # ==================================
 	def flush_buffer(self ):
-		time.sleep(.1)
-		self.ser_conn.read(10000)
-		# self.ser_conn.flush()
+		#do a read& return to flush buffer
+		self.read_and_return( ignore_full_response = True )
 
 
 #---------------------------------------------------------------------
