@@ -456,9 +456,11 @@ class Mailbox():
 
     def set_data( self, data, idx ):
         if self.mailbox_map[idx][mailbox_idx.SRC] not in self.manage_list:
+            raise( "attempting to set incorrect index")
             return False
 
         if type(self.mailbox_map[idx][mailbox_idx.DATA]) != type( data ):
+            raise( "attempting to set incorrect data type")
             return False
         
         self.mailbox_map[idx][mailbox_idx.DATA] = data

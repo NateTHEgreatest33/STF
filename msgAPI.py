@@ -12,6 +12,7 @@
 #                              PC Flag
 #---------------------------------------------------------------------
 PC_TESTING = True
+DEBUG_PRINTS = False
 
 #---------------------------------------------------------------------
 #                              IMPORTS
@@ -60,7 +61,7 @@ class messageAPI:
 		self.listOfModules = listOfModules
 		self.version_num = 2
 		self.curr_key = 0x00
-		self.debug_prints = True
+		self.debug_prints = DEBUG_PRINTS
 		self.last_fifo_idx = 0;
 
 		if( PC_TESTING ):
