@@ -445,7 +445,7 @@ class Mailbox():
         # --------------------------------
         if type(data_var) == type(float()):
             data = data[0:4]
-            data.reverse()
+            # data.reverse() #on MACOS this is correct
             #Pi pico + macOS + rPi 3B+ is little endian so this should still work correctlty                  <--- this NEEDS to be verified
             raw_unit8_data = np.array(data[0:4], dtype='uint8')
             rtn = raw_unit8_data.view('<f4') #cast into float32
