@@ -13,24 +13,26 @@
 #---------------------------------------------------------------------
 #                              DEBUG
 #--------------------------------------------------------------------- 
-Debug        = False #debug just this file (imports + main function)
-Debug_test   = False #if we have imported this from a system test but want to run fake msgAPI
-Debug_hw     = False #force skip TIVA board
-Debug_prints = True 
+SIMULATE_HW         = False #simulate HW by using simulation messageAPI
+SIMULATE_HW_TESTING = False #simulate HW by using simulation messageAPI
+                            #but fix include path if running as a test
+DEBUG_PRINTS        = True  #print mailbox debug log
+
 #---------------------------------------------------------------------
 #                              IMPORTS
 #--------------------------------------------------------------------- 
 import time
 from enum import IntEnum
-
-# needed for float32
 import numpy as np
 import struct
 
-#only do this to fix imports
-if Debug_test:
+# ------------------------------------
+# Determine include path based upon
+# debug flags set
+# ------------------------------------
+if SIMULATE_HW_TESTING:
     from lib.util.msgAPI_sim import messageAPI
-elif Debug:
+elif SIMULATE_HW:
     from util.msgAPI_sim import messageAPI 
 else:
     from lib.msgAPI import messageAPI
@@ -66,6 +68,7 @@ class mailbox_idx(IntEnum):
 #---------------------------------------------------------------------
 #                              VARIABLES
 #--------------------------------------------------------------------- 
+# used for local testing (main() within this file)
 global_mailbox = [
 # data, type,   flag,  dir,  src,                    dest
 [ 0,   'ASYNC', False, 'RX', modules.RPI_MODULE,  modules.PICO_MODULE ],
@@ -345,10 +348,6 @@ class Mailbox():
     # __round_update() 
     # ==================================	
     def __round_update( self ):
-        if Debug_hw:
-            self.current_round = int(modules.PICO_MODULE)
-            return
-
 		# ------------------------------------
 		# Update current round & account for
         # rollovers
@@ -606,7 +605,7 @@ def main():
 
         mailbox.set_data( 5.5, 3 )
 
-        if Debug:
+        if SIMULATE_HW:
             #Pretend to send acks from other unit
             ack_msg = [ int(special_response.ACK_ID), 0x02 ]
             msg_conn.rx_data_fill(src=int(modules.RPI_MODULE), data=ack_msg, validity=True)

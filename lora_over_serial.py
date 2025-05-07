@@ -77,6 +77,9 @@ class lora_serial:
 		if response[:5] == "Error":
 			return []
 
+		if self.print_cmds:
+			print("Raw Lora Read: {}".format( response) )
+
 		#format return
 		rsp_list = response.split()
 		rtn_lst = []
