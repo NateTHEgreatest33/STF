@@ -6,7 +6,7 @@
 #   DESCRIPTION:
 #       Provides results collection and file generation
 #
-#   Copyright 2024 by Nate Lenze
+#   Copyright 2025 by Nate Lenze
 #*********************************************************************
 
 #---------------------------------------------------------------------
@@ -64,6 +64,7 @@ class results:
     def test_requirement( self, req ):
         self.req_list.append( req )
         print( consoleColor.HEADER + "Req Tested > "+ req )
+
     # ================================
     # test step
     # ================================
@@ -103,7 +104,10 @@ class results:
     def __global_compare( self, result, cmp_type, x, y, case ):
         self.test_case_list.append( [result, cmp_type, x, y, case ] )
         self.__console( result, cmp_type, x, y, case )
-    
+
+    # ================================
+    # console output
+    # ================================
     def __console( self, result, cmp_type, x, y, case ):
         if cmp_type == "step":
             print( consoleColor.HEADER + case )
@@ -137,44 +141,95 @@ class results:
         # ============================
         # format & open results file
         # ============================
-        results_file = self.file_under_test[:-3] + "_results.txt"
+        results_file = self.file_under_test[:-3] + "_results.html"
         f = open(results_file, "w")
 
         # ============================
-        # add general header info
+        # add general header info (as a small table)
         # ============================
-        f.writelines( "file under test: {}\n".format(os.path.basename(self.file_under_test)) )
-        f.writelines( "current test:    {}\n".format(os.path.basename(results_file) ) )
-        f.writelines( "FUT sha:         {}\n".format(self.checksum ) )
-        f.writelines( "date:            {}\n".format(self.date_time.ctime()) )
+        f.write("<!DOCTYPE html>\n")
+        f.write("<html>\n")
+        f.write("<head>\n")
+        f.write("<title>Test Results</title>\n")
+        f.write("<style>\n")
+        f.write("  body { font-family: Arial, sans-serif; color: #333; line-height: 1.4; }\n")
+        f.write("  .container { width: 80%; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px; }\n")
+        f.write("  h1 { text-align: center; color: #444; margin-bottom: 20px; }\n")
+        f.write("  h2 { color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px; }\n")
+        f.write("  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9em; }\n")
+        f.write("  .info-table td { border: 1px solid #eee; padding: 5px; text-align: left; }\n")
+        f.write("  .info-table td:first-child { font-weight: bold; width: 150px; }\n")
+        f.write("  .test-case-block { border: 1px solid #ddd; margin-bottom: 10px; padding: 10px; border-radius: 5px; }\n")
+        f.write("  .test-case-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }\n")
+        f.write("  .test-case-header h4 { margin: 0; color: #666; }\n")
+        f.write("  .status-pass { color: white; background-color: green; padding: 3px 8px; border-radius: 3px; font-size: 0.9em; }\n")
+        f.write("  .status-fail { color: white; background-color: red; padding: 3px 8px; border-radius: 3px; font-size: 0.9em; }\n")
+        f.write("  .details { padding-left: 15px; display: none; font-size: 0.9em; }\n")
+        f.write("  .detail { margin-bottom: 3px; }\n")
+        f.write("  .step-block { border: 1px solid #eee; margin-bottom: 8px; padding: 8px; border-radius: 5px; background-color: #f8f8f8; display: flex; justify-content: space-between; align-items: center; }\n")
+        f.write("  .step-tag { color: #555; font-style: italic; font-size: 0.9em; background-color: #ffdd57; padding: 3px 6px; border-radius: 3px; }\n")
+        f.write("  .overall-pass { color: white; background-color: green; padding: 10px; border-radius: 5px; text-align: center; margin-top: 20px; font-weight: bold; }\n")
+        f.write("  .overall-fail { color: white; background-color: red; padding: 10px; border-radius: 5px; text-align: center; margin-top: 20px; font-weight: bold; }\n")
+        f.write("</style>\n")
+        f.write("</head>\n")
+        f.write("<body>\n")
+        f.write("<div class='container'>\n")  # Start container div
 
-        f.writelines( "\nRequirements Tested: \n" )
-        for req in self.req_list:
-            f.writelines( req + "\n" )
+        f.write("<h1>{}  Results</h1>\n".format(self.file_under_test[:-3]))
+        f.write("<table class='info-table'>\n")
+        f.write("  <tr><td>File Under Test:</td><td>{}</td></tr>\n".format(os.path.basename(self.file_under_test)))
+        f.write("  <tr><td>Current Test:</td><td>{}</td></tr>\n".format(os.path.basename(results_file)))
+        f.write("  <tr><td>FUT sha:</td><td>{}</td></tr>\n".format(self.checksum))
+        f.write("  <tr><td>Date:</td><td>{}</td></tr>\n".format(self.date_time.ctime()))
+        f.write("</table>\n")
+
+        f.write("<h2>Requirements Tested</h2>\n")
+        if self.req_list:
+            f.write("<ul>\n")
+            for req in self.req_list:
+                f.write("  <li>{}</li>\n".format(req))
+            f.write("</ul>\n")
+        else:
+            f.write("<p>No requirements tested.</p>\n")
 
         # ============================
-        # run through test-cases
+        # run through test-cases (as collapsible blocks with status)
         # ============================
-        f.writelines( "\nTest Cases: \n" )
-        for [result, cmp_type, x, y, case ] in self.test_case_list:
+        f.write("<h2>Test Cases</h2>\n")
+        for index, [result, cmp_type, x, y, case ] in enumerate(self.test_case_list):
             # =========================
             # Special handling for step's
             # =========================
             if cmp_type == "step":
-                f.writelines("> " + case + "\n")
+                f.write(f"<div class='step-block'><span>{case}</span><!--<span class='step-tag'>Step</span>--></div>\n")
                 continue
 
             # =========================
-            # normal handling
+            # normal handling (as collapsible blocks with status)
             # =========================
             pass_fail = pass_fail and result
-            test_case_str = case + ": " + self.__text_cleanser(x) + " " + cmp_type + " " + self.__text_cleanser(y) + "\nRESULT: " + str( result ) + "\n"
-            f.writelines(test_case_str )
+            status_class = "status-pass" if result else "status-fail"
+            status_text = "Pass" if result else "Fail"
+            block_id = f"test-case-{index}"
+            f.write(f"<div class='test-case-block' onclick=\"toggleDetails('{block_id}')\">\n")
+            f.write(f"  <div class='test-case-header'>\n")
+            # f.write(f"    <h4>Test Case: {case}</h4>\n")
+            f.write(f"    <h4>{case}</h4>\n")
+            f.write(f"    <span class='{status_class}'>{status_text}</span>\n")
+            f.write("  </div>\n")
+            f.write(f"  <div id='{block_id}' class='details'>\n")
+            f.write(f"    <p class='detail'><b>Comparison:</b> {cmp_type}</p>\n")
+            f.write(f"    <p class='detail'><b>Expected:</b> {self.__text_cleanser(x)}</p>\n")
+            f.write(f"    <p class='detail'><b>Actual:</b> {self.__text_cleanser(y)}</p>\n")
+            f.write("  </div>\n")
+            f.write("</div>\n")
 
         # ============================
-        # Print overal result to file
+        # Print overall result to file (at the end)
         # ============================
-        f.writelines( "\n\nOverall Result:  {}\n".format( str(pass_fail) ) )
+        f.write("<h2>Overall Result</h2>\n")
+        overall_result_class = "overall-pass" if pass_fail else "overall-fail"
+        f.write("<p class='{}'>Overall Test Result: {}</p>\n".format(overall_result_class, "Pass" if pass_fail else "Fail"))
 
         # ============================
         # Print overal result to console
@@ -184,6 +239,23 @@ class results:
         print( color + str(pass_fail) )
 
         # ============================
+        # Add JavaScript for toggling details
+        # ============================
+        f.write("<script>\n")
+        f.write("function toggleDetails(id) {\n")
+        f.write("  var details = document.getElementById(id);\n")
+        f.write("  if (details.style.display === 'none') {\n")
+        f.write("    details.style.display = 'block';\n")
+        f.write("  } else {\n")
+        f.write("    details.style.display = 'none';\n")
+        f.write("  }\n")
+        f.write("}\n")
+        f.write("</script>\n")
+
+        # ============================
         # close file
         # ============================
+        f.write("</div>\n")  # Close container div
+        f.write("</body>\n")
+        f.write("</html>\n")
         f.close()
