@@ -64,6 +64,7 @@ class results:
     def test_requirement( self, req ):
         self.req_list.append( req )
         print( consoleColor.HEADER + "Req Tested > "+ req )
+
     # ================================
     # test step
     # ================================
@@ -103,7 +104,10 @@ class results:
     def __global_compare( self, result, cmp_type, x, y, case ):
         self.test_case_list.append( [result, cmp_type, x, y, case ] )
         self.__console( result, cmp_type, x, y, case )
-    
+
+    # ================================
+    # console output
+    # ================================
     def __console( self, result, cmp_type, x, y, case ):
         if cmp_type == "step":
             print( consoleColor.HEADER + case )
@@ -221,7 +225,7 @@ class results:
             f.write("</div>\n")
 
         # ============================
-        # Print overal result to file (at the end)
+        # Print overall result to file (at the end)
         # ============================
         f.write("<h2>Overall Result</h2>\n")
         overall_result_class = "overall-pass" if pass_fail else "overall-fail"
