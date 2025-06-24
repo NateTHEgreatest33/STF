@@ -31,7 +31,8 @@ class lora_serial:
     # ==================================
     # Constructor
     # ==================================
-	def __init__(self, port="/dev/cu.usbmodem1101", baud=115200, debug_prints=False ):
+	def __init__(self, port="/dev/tty.usbmodem1401", baud=115200, debug_prints=False ):
+	# def __init__(self, port="/dev/cu.usbmodem1101", baud=115200, debug_prints=False ):
 		self.print_cmds = debug_prints
 		self.ser_conn = serial.Serial(port=port, baudrate=115200, timeout=0)
 		self.ser_conn.close()
@@ -40,6 +41,8 @@ class lora_serial:
 		self.send_cmd( "junkcmd" ) #clear out command buffer and flush
 		self.read_and_return()
 		self.glb_dbg = [] #allows you to see full response (helpful for debugging)
+		
+		raise("for whatever reason we miss the first Rx over lora on a switch. for mailboxAPI this means we miss ACKS. this may be due to the speed of TX/RX")
 		
     # ==================================
     # x()

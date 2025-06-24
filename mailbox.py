@@ -172,9 +172,11 @@ class Mailbox():
             # ---------------------------------
             # If missing an ACK, report error &
             # clear for next round
+            #add to tx queue
             # ---------------------------------
             if self.expecting_ack_map[idx] == True:
                 print("Missing ACK for idx {}".format( idx ) )
+                self.tx_queue.append( ['data', idx] ) #add data to queue (this may result in a double send). Ideally we should switch from tx_queue to tx_map or something
                 self.expecting_ack_map[ idx ] = False
 
 		# ------------------------------------
@@ -627,3 +629,6 @@ def main():
 #---------------------------------------------------------------------
 if __name__ == "__main__":
     main()
+
+
+    #TODO: need to rework ACK system to properly accept acks + match ack resend behavior
