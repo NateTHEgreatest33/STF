@@ -11,7 +11,7 @@
 #---------------------------------------------------------------------
 #                              PC Flag
 #---------------------------------------------------------------------
-PC_TESTING = True
+PC_TESTING = False
 DEBUG_PRINTS = False
 
 #---------------------------------------------------------------------
@@ -91,6 +91,7 @@ class messageAPI:
 			print("message greater than size 10, not sending")
 			return False
 		if( destination not in self.listOfModules and destination != self.module_all ):
+			print("message destination not valid, not sending")
 			return False
 
 		version_size_var = (self.version_num << 4 ) | message_size

@@ -17,7 +17,6 @@ SIMULATE_HW         = False #simulate HW by using simulation messageAPI
 SIMULATE_HW_TESTING = False #simulate HW by using simulation messageAPI
                             #but fix include path if running as a test
 DEBUG_PRINTS        = True  #print mailbox debug log
-RASP_PI_MODE        = True #endianess for Raspberry Pi (linux)
 
 #---------------------------------------------------------------------
 #                              IMPORTS
@@ -448,10 +447,8 @@ class Mailbox():
         if type(data_var) == type(float()):
             data = data[0:4]
 
-            #3B+ is big endian so this needs to be reversed
-            if RASP_PI_MODE:
-                data.reverse()
-            raw_unit8_data = np.array(data[4:0], dtype='uint8')
+            #3B+ + pico + masOS are little endian so no need to reverse
+            raw_unit8_data = np.array(data[0:4], dtype='uint8')
 
             rtn = raw_unit8_data.view('<f4') #cast into float32
             self.mailbox_map[ idx ][mailbox_idx.DATA] = float(rtn[0])
