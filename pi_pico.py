@@ -35,7 +35,7 @@ class pi_pico:
 								bus = 0, 
 								chip_select = 0, 
 								currentModule = 0x00, 
-								listOfModules=[0x00,0x01,0x02] 
+								listOfModules=[0x00,0x01] 
 								)
 		self.console_conn = consoleAPI()
 		self.msg_conn.InitAPI()

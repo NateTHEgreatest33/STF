@@ -8,12 +8,21 @@
 #
 #   Copyright 2024 by Nate Lenze
 #*********************************************************************
+#---------------------------------------------------------------------
+#                              PC Flag
+#---------------------------------------------------------------------
+PC_TESTING = False
+DEBUG_PRINTS = False
 
 #---------------------------------------------------------------------
 #                              IMPORTS
 #---------------------------------------------------------------------
+if( PC_TESTING ):
+	from lib.lora_over_serial import lora_serial
+else:
+	import spidev
 import time
-import spidev
+
 
 #---------------------------------------------------------------------
 #                             VARIABLES
@@ -48,17 +57,21 @@ class messageAPI:
 	def __init__(self, bus, chip_select, currentModule, listOfModules):
 		#setup local var's
 		self.currentModule = currentModule
+		self.module_all    = len(listOfModules) + 1
 		self.listOfModules = listOfModules
 		self.version_num = 2
 		self.curr_key = 0x00
-		self.debug_prints = True
+		self.debug_prints = DEBUG_PRINTS
 		self.last_fifo_idx = 0;
 
-		# Enable SPI
-		self.spi = spidev.SpiDev()
-		self.spi.open(bus, chip_select)
-		self.spi.max_speed_hz = 100000
-		self.spi.mode = 0
+		if( PC_TESTING ):
+			self.lora_serr_conn = lora_serial()
+		else:
+			# Enable SPI
+			self.spi = spidev.SpiDev()
+			self.spi.open(bus, chip_select)
+			self.spi.max_speed_hz = 100000
+			self.spi.mode = 0
 
     # ==================================
     # InitAPI()
@@ -75,8 +88,10 @@ class messageAPI:
 		message_size = len(message)
 		if( message_size > 10):
 			#message is too large to send, return false
+			print("message greater than size 10, not sending")
 			return False
-		if( destination not in self.listOfModules):
+		if( destination not in self.listOfModules and destination != self.module_all ):
+			print("message destination not valid, not sending")
 			return False
 
 		version_size_var = (self.version_num << 4 ) | message_size
@@ -134,7 +149,7 @@ class messageAPI:
 			# Byte 5 -- start of data region
 			# Byte X -- crc (last byte)
 			destination = return_msg[0]
-			if destination != self.currentModule:
+			if destination != self.currentModule and destination != self.module_all:
 				return False, 0xFF, [], True
 
 			source = return_msg[1]
@@ -160,20 +175,24 @@ class messageAPI:
     # RX_multi()
     # ==================================
 	def RX_Multi(self):
-		if self.__LoraCheckMessage() == True:
+		#handle Rx message
+		if( PC_TESTING ):
+			return_msg = self.lora_serr_conn.LoraReadMessageMulti()
+			if len(return_msg) == 0:
+				return None
+		else:
+			if self.__LoraCheckMessage() == False:
+				return None
 			return_msg = self.__LoraReadMessageMulti()
 
-			#print full message
-			if self.debug_prints:
-				print("Full message received: {",end =" ")
-				for x in return_msg:
-					print(hex(x),end = " ")
-				print("}")
+		#print full message
+		if self.debug_prints:
+			print("Full message received: {",end =" ")
+			for x in return_msg:
+				print(hex(x),end = " ")
+			print("}")
 
-			return self.__parseRawLora( return_msg )
-
-		else:
-			return None
+		return self.__parseRawLora( return_msg )
 
 
     # ==================================
@@ -225,7 +244,7 @@ class messageAPI:
 			curr_msg = message[start_index:(start_index + 6 + dataSize)]
 
 			destination = curr_msg[0]
-			if destination == self.currentModule:
+			if destination == self.currentModule or destination == self.module_all:
 				source = curr_msg[1]
 				version = ( curr_msg[3] & 0xF0 ) >> 4
 				key = curr_msg[4]
@@ -311,7 +330,10 @@ class messageAPI:
     # __LoraReadMessageSingle()
     # ==================================
 	def __LoraReadMessageSingle(self):
-
+		#overwrite lora_send_msg depending on usecase
+		if( PC_TESTING):
+			return self.lora_serr_conn.LoraReadMessageSingle()
+			
 		#clear flag
 		msg = [0x80 | 0x12, 0xFF]
 		result = self.spi.xfer2(msg)
@@ -349,6 +371,10 @@ class messageAPI:
     # __LoraReadMessageMulti()
     # ==================================
 	def __LoraReadMessageMulti(self):
+		#overwrite lora_send_msg depending on usecase
+		if( PC_TESTING):
+			return self.lora_serr_conn.LoraReadMessageMulti()
+		
 		#clear flag
 		msg = [0x80 | 0x12, 0xFF]
 		result = self.spi.xfer2(msg)
@@ -408,6 +434,11 @@ class messageAPI:
     # __LoraSetRxMode()
     # ==================================
 	def __LoraSetRxMode(self):
+		#overwrite lora_send_msg depending on usecase
+		if( PC_TESTING):
+			self.lora_serr_conn.LoraSetRxMode()
+			return
+		
 		msg = [0x80 | 0x01,0x80]
 		result = self.spi.xfer2(msg)
 
@@ -427,6 +458,11 @@ class messageAPI:
     # __LoraSendMessage()
     # ==================================
 	def __LoraSendMessage( self, messageList, messageSize):
+		#overwrite lora_send_msg depending on usecase
+		if( PC_TESTING):
+			self.lora_serr_conn.LoraSendMessage( messageList, messageSize)
+			return
+
 		msg = [0x80 | 0x01, 0x81]
 		result = self.spi.xfer2(msg)
 
@@ -466,16 +502,3 @@ class messageAPI:
 				print(hex(x),end =" ")
 			print("}")
 
-
-
-
-#Test API
-#module = messageAPI( bus=0, chip_select=0, currentModule=0x00, listOfModules=[0x00,0x01] )
-#module.InitAPI()
-#module.TXMessage( message=[0x11,0x22,0x33], destination=0x01 )
-
-#while True:
-#	return_tpl = module.RXMessage()
-#	if return_tpl[0] == True:
-#		print("source:", return_tpl[1], "data recvied: ", return_tpl[2]," valid: ", return_tpl[3] )
-#
