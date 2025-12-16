@@ -30,7 +30,7 @@ class pi_pico:
 	# ==================================
 	# Constructor
 	# ==================================
-	def __init__(self, test_mode = False, power_cycle_pin=23 ):
+	def __init__(self, test_mode = False, power_cycle_pin=23, load_software=True, load_software_path="" ):
 		self.msg_conn = messageAPI( 
 								bus = 0, 
 								chip_select = 0, 
@@ -40,6 +40,15 @@ class pi_pico:
 		self.console_conn = consoleAPI()
 		self.msg_conn.InitAPI()
 		
+		# ------------------------------------
+		# If load software is requested, load
+		# requested software. If none is 
+		# provided (ie. ""), we will assume 
+		# FIRMWARE_PATH env-variable is set
+		# ------------------------------------
+		if( load_software ):
+			self.load_software( load_software_path )
+
 		# ------------------------------------
 		# setup power cycle pin. Power cycle
 		# happens when RUN pin on the pico
@@ -97,9 +106,17 @@ class pi_pico:
 	# ==================================
 	# load_software()
 	# ==================================
-	def load_software( self, elf_file_path ) -> 'None':
+	def load_software( self, elf_file_path = "" ) -> 'None':
+		# ------------------------------------
+		# Github runner will define FIRMWARE_PATH
+		# in the case no software path is defined
+		# when load_software is called
+		# ------------------------------------
+		if( elf_file_path == "" and os.environ.get("FIRMWARE_PATH") ):
+			elf_file_path = os.environ.get("FIRMWARE_PATH")
+
 		self.console_conn.write_and_read( "bootsel" )
-		os.system( "picotool load {}".format( elf_file_path) )
+		os.system( "sudo picotool load {}".format( elf_file_path) )
 		self.power_cycle()
 
 	# ==================================
